@@ -52,6 +52,7 @@ export default async function Home({
 
   const tournaments = await prisma.tournament.findMany({
     orderBy: { createdAt: "desc" },
+    relationLoadStrategy: "join",
     include: { _count: { select: { players: true } } },
     where: {
       ...(activeStatus !== "ALL" ? { status: activeStatus } : {}),

@@ -5,6 +5,7 @@ import { ensureAdmin, unauthorized } from "@/lib/api-utils";
 export async function GET() {
   const tournaments = await prisma.tournament.findMany({
     orderBy: { createdAt: "desc" },
+    relationLoadStrategy: "join",
     include: { _count: { select: { players: true } } },
   });
   return NextResponse.json(tournaments);

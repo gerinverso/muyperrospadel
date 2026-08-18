@@ -16,6 +16,7 @@ export default async function PublicTournamentPage({
 
   const tournament = await prisma.tournament.findUnique({
     where: { id },
+    relationLoadStrategy: "join",
     include: {
       players: { orderBy: { createdAt: "asc" } },
       pairs: {

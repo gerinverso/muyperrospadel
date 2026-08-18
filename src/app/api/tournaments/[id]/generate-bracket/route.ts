@@ -124,6 +124,7 @@ export async function POST(
 
   const updated = await prisma.tournament.findUnique({
     where: { id },
+    relationLoadStrategy: "join",
     include: {
       matches: {
         where: { groupId: null },

@@ -14,6 +14,7 @@ export default async function AdminDashboard() {
 
   const tournaments = await prisma.tournament.findMany({
     orderBy: { createdAt: "desc" },
+    relationLoadStrategy: "join",
     include: { _count: { select: { players: true } } },
   });
 

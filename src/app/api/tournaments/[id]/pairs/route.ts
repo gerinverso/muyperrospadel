@@ -92,6 +92,7 @@ export async function POST(
 
   const updated = await prisma.tournament.findUnique({
     where: { id },
+    relationLoadStrategy: "join",
     include: {
       pairs: { include: { player1: true, player2: true } },
     },
