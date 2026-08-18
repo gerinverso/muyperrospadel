@@ -1,0 +1,119 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum TournamentStatus {
+  SETUP // cargando jugadores
+  PAIRS_DONE // parejas sorteadas, falta elegir formato y armar zonas/cuadro
+  GROUP_STAGE // fase de grupos en juego (solo formato GROUPS_KO)
+  IN_PROGRESS // cuadro de eliminacion armado, jugandose
+  FINISHED // hay un campeon
+}
+
+enum TournamentFormat {
+  SINGLE_ELIMINATION // eliminacion directa desde el sorteo de parejas
+  GROUPS_KO // fase de grupos (zonas) y luego eliminacion directa con los clasificados
+}
+
+model Tournament {
+  id                 String           @id @default(cuid())
+  name               String
+  status             TournamentStatus @default(SETUP)
+  format             TournamentFormat @default(SINGLE_ELIMINATION)
+  groupsCount        Int? // cantidad de zonas, solo si format = GROUPS_KO
+  qualifiersPerGroup Int? // cuantas parejas clasifican por zona
+  registrationFee    Decimal?         @db.Decimal(10, 2) // lo que pone cada jugador
+  courtCost          Decimal?         @db.Decimal(10, 2) // costo total de canchas
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  players Player[]
+  pairs   Pair[]
+  groups  Group[]
+  matches Match[]
+}
+
+model Player {
+  id           String  @id @default(cuid())
+  name         String
+  tournamentId String
+  tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+
+  pairAsPlayer1 Pair? @relation("PairPlayer1")
+  pairAsPlayer2 Pair? @relation("PairPlayer2")
+
+  createdAt DateTime @default(now())
+}
+
+model Group {
+  id           String @id @default(cuid())
+  tournamentId String
+  tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+
+  name  String // "Zona A", "Zona B", ...
+  index Int // 0-based, para ordenar y armar el nombre
+
+  pairs   Pair[]
+  matches Match[]
+
+  createdAt DateTime @default(now())
+
+  @@unique([tournamentId, index])
+}
+
+model Pair {
+  id           String @id @default(cuid())
+  tournamentId String
+  tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+
+  player1Id String @unique
+  player1   Player @relation("PairPlayer1", fields: [player1Id], references: [id])
+  player2Id String @unique
+  player2   Player @relation("PairPlayer2", fields: [player2Id], references: [id])
+
+  groupId String?
+  group   Group?  @relation(fields: [groupId], references: [id])
+
+  matchesAsA Match[] @relation("MatchPairA")
+  matchesAsB Match[] @relation("MatchPairB")
+  matchesWon Match[] @relation("MatchWinner")
+
+  createdAt DateTime @default(now())
+}
+
+model Match {
+  id           String @id @default(cuid())
+  tournamentId String
+  tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+
+  // Si groupId esta seteado, es un partido de fase de grupos (round = 0, slot
+  // incremental global). Si es null, es un partido de cuadro de eliminacion
+  // (round = 1 es la primera ronda, slot unico dentro de la ronda).
+  groupId String?
+  group   Group?  @relation(fields: [groupId], references: [id])
+
+  round Int
+  slot  Int
+
+  pairAId String?
+  pairA   Pair?   @relation("MatchPairA", fields: [pairAId], references: [id])
+  pairBId String?
+  pairB   Pair?   @relation("MatchPairB", fields: [pairBId], references: [id])
+
+  winnerId String?
+  winner   Pair?   @relation("MatchWinner", fields: [winnerId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@unique([tournamentId, round, slot])
+}
