@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { pairLabel, statusLabels } from "@/lib/types";
@@ -57,18 +58,28 @@ export default async function PublicTournamentPage({
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-10">
-      <header>
+      <header className="flex flex-col gap-4">
         <Link
           href="/"
           className="text-sm text-on-surface-variant hover:text-primary-fixed hover:underline"
         >
           ← Todos los torneos
         </Link>
-        <div className="mt-1 flex items-center justify-between">
+        <div className="card-border relative flex h-44 w-full items-center justify-center overflow-hidden rounded-xl bg-white">
+          <Image
+            src="/logo.jpg"
+            alt="Muy Perros Pádel"
+            fill
+            sizes="(max-width: 768px) 100vw, 768px"
+            priority
+            className="object-contain p-3"
+          />
+        </div>
+        <div className="flex items-center justify-between gap-2">
           <h1 className="font-headline-md text-headline-md text-on-surface">
             {tournament.name}
           </h1>
-          <span className="rounded-full bg-surface-container-high px-3 py-1 text-xs font-medium text-on-surface-variant">
+          <span className="whitespace-nowrap rounded-full bg-surface-container-high px-3 py-1 text-xs font-medium text-on-surface-variant">
             {statusLabels[tournament.status]}
           </span>
         </div>

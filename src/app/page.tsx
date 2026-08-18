@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { prisma } from "@/lib/prisma";
 import { statusLabels, type TournamentStatus } from "@/lib/types";
 
@@ -76,8 +77,7 @@ export default async function Home({
             Torneos Activos
           </h1>
           <p className="font-body-lg text-body-lg mt-2 max-w-2xl text-on-surface-variant">
-            Encontrá tu próximo desafío. Sumate a los torneos entre amigos y
-            demostrá tu nivel en la pista.
+            MATIAS PAVONI JUGADOR REVELACION DEL CLUB
           </p>
         </div>
       </header>
@@ -128,8 +128,14 @@ export default async function Home({
                 key={t.id}
                 className="card-border neon-glow-hover group flex flex-col overflow-hidden rounded-lg bg-surface-container transition-all duration-300"
               >
-                <div className="relative flex h-32 w-full items-center justify-center bg-surface-container-high">
-                  <span className="text-5xl">🎾</span>
+                <div className="relative flex h-40 w-full items-center justify-center bg-white p-2">
+                  <Image
+                    src="/logo.jpg"
+                    alt="Muy Perros Pádel"
+                    fill
+                    sizes="(max-width: 768px) 100vw, 33vw"
+                    className="object-contain p-2"
+                  />
                   <div
                     className={`font-label-caps text-label-caps absolute left-space-sm top-space-sm rounded border px-2 py-1 ${STATUS_BADGE_CLASSES[tStatus]}`}
                   >

@@ -5,7 +5,7 @@ export default function Footer() {
         Muy Perros Pádel
       </div>
       <div className="font-body-md text-body-md text-sm text-on-surface-variant">
-        © {new Date().getFullYear()} Muy Perros Pádel — La comunidad del pádel
+        © {new Date().getFullYear()} Muy Perros Pádel — GERMAN DEV
       </div>
     </footer>
   );

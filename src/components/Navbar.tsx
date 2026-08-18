@@ -1,14 +1,22 @@
 import Link from "next/link";
+import Image from "next/image";
 
 export default function Navbar() {
   return (
-    <nav className="sticky top-0 z-50 flex w-full items-center justify-between border-b border-outline-variant bg-background/95 px-margin-mobile py-4 backdrop-blur-sm md:px-margin-desktop">
+    <nav className="sticky top-0 z-50 flex w-full items-center justify-between border-b border-outline-variant bg-background/95 px-margin-mobile py-3 backdrop-blur-sm md:px-margin-desktop">
       <div className="flex items-center gap-space-md">
-        <Link
-          href="/"
-          className="font-headline-md text-headline-md font-black uppercase tracking-tighter text-primary-fixed"
-        >
-          Muy Perros Pádel
+        <Link href="/" className="flex items-center gap-2">
+          <Image
+            src="/logo.jpg"
+            alt="Muy Perros Pádel"
+            width={48}
+            height={48}
+            priority
+            className="h-11 w-11 rounded-lg"
+          />
+          <span className="font-headline-md text-headline-md hidden font-black uppercase tracking-tighter text-primary-fixed sm:inline">
+            Muy Perros Pádel
+          </span>
         </Link>
         <div className="ml-space-lg hidden gap-space-md md:flex">
           <Link
