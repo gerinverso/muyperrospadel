@@ -19,15 +19,19 @@ const globalForPrisma = globalThis as unknown as {
  */
 function buildAdapter() {
   const rawUrl = process.env.DATABASE_URL ?? "";
-  const pool = {
-    max: 3,
-    idleTimeoutMillis: 10_000,
-    connectionTimeoutMillis: 15_000,
-  };
   try {
     const url = new URL(rawUrl);
     const isLocal =
       url.hostname === "localhost" || url.hostname === "127.0.0.1";
+    // El transaction pooler de Supabase (puerto 6543) multiplexa conexiones, así
+    // que podemos tener un pool más grande por instancia sin saturar. El session
+    // pooler (5432) tiene un límite total bajo (~15), así que ahí vamos chicos.
+    const isTransactionPooler = url.port === "6543";
+    const pool = {
+      max: isTransactionPooler ? 10 : 3,
+      idleTimeoutMillis: 10_000,
+      connectionTimeoutMillis: 15_000,
+    };
     url.searchParams.delete("sslmode");
     const connectionString = url.toString();
     return new PrismaPg(
@@ -36,7 +40,12 @@ function buildAdapter() {
         : { connectionString, ssl: { rejectUnauthorized: false }, ...pool }
     );
   } catch {
-    return new PrismaPg({ connectionString: rawUrl, ...pool });
+    return new PrismaPg({
+      connectionString: rawUrl,
+      max: 3,
+      idleTimeoutMillis: 10_000,
+      connectionTimeoutMillis: 15_000,
+    });
   }
 }
 
