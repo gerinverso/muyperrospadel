@@ -6,14 +6,24 @@ const globalForPrisma = globalThis as unknown as {
 };
 
 /**
- * Construye la config del adapter pg. node-postgres interpreta `sslmode=require`
- * como `verify-full` y rechaza la cadena de certificados del pooler de Supabase
- * (SELF_SIGNED_CERT_IN_CHAIN). Para hosts remotos usamos SSL sin verificación
- * estricta de CA; para localhost, sin SSL. El CLI de Prisma sigue leyendo
- * DATABASE_URL (con sslmode) por su cuenta para las migraciones.
+ * Construye la config del adapter pg.
+ *
+ * - SSL: node-postgres interpreta `sslmode=require` como `verify-full` y rechaza
+ *   la cadena de certificados del pooler de Supabase (SELF_SIGNED_CERT_IN_CHAIN).
+ *   Para hosts remotos usamos SSL sin verificación estricta de CA; en localhost, sin SSL.
+ * - Pool chico: el pooler de Supabase (session mode) limita el total de clientes
+ *   (pool_size ~15). Un pool grande lo satura y tira `EMAXCONNSESSION`. Mantenemos
+ *   pocas conexiones y cerramos las ociosas rápido.
+ *
+ * El CLI de Prisma sigue leyendo DATABASE_URL (con sslmode) por su cuenta para migraciones.
  */
 function buildAdapter() {
   const rawUrl = process.env.DATABASE_URL ?? "";
+  const pool = {
+    max: 3,
+    idleTimeoutMillis: 10_000,
+    connectionTimeoutMillis: 15_000,
+  };
   try {
     const url = new URL(rawUrl);
     const isLocal =
@@ -22,11 +32,11 @@ function buildAdapter() {
     const connectionString = url.toString();
     return new PrismaPg(
       isLocal
-        ? { connectionString }
-        : { connectionString, ssl: { rejectUnauthorized: false } }
+        ? { connectionString, ...pool }
+        : { connectionString, ssl: { rejectUnauthorized: false }, ...pool }
     );
   } catch {
-    return new PrismaPg({ connectionString: rawUrl });
+    return new PrismaPg({ connectionString: rawUrl, ...pool });
   }
 }
 

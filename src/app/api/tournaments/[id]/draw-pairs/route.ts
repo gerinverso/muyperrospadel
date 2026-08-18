@@ -19,9 +19,15 @@ export async function POST(
   if (!tournament) {
     return NextResponse.json({ error: "Torneo no encontrado" }, { status: 404 });
   }
-  if (tournament.status !== "SETUP") {
+  // Se puede sortear en SETUP (primera vez) o re-sortear en PAIRS_DONE. Una vez
+  // que se armaron zonas o cuadro (GROUP_STAGE/IN_PROGRESS/FINISHED) hay que
+  // "volver atrás" primero con /reset.
+  if (tournament.status !== "SETUP" && tournament.status !== "PAIRS_DONE") {
     return NextResponse.json(
-      { error: "Las parejas ya fueron sorteadas para este torneo" },
+      {
+        error:
+          "Ya se armaron zonas o cuadro. Volvé a la etapa de parejas para re-sortear.",
+      },
       { status: 409 }
     );
   }
@@ -41,6 +47,8 @@ export async function POST(
   const pairs = drawPairs(tournament.players.map((p) => p.id));
 
   await prisma.$transaction([
+    // Si es un re-sorteo (PAIRS_DONE), borramos las parejas anteriores primero.
+    prisma.pair.deleteMany({ where: { tournamentId: id } }),
     ...pairs.map(([p1, p2]) =>
       prisma.pair.create({
         data: { tournamentId: id, player1Id: p1, player2Id: p2 },

@@ -41,17 +41,17 @@ export default function AdminTournamentPanel({
     load();
   }, [load]);
 
-  async function withBusy(fn: () => Promise<void>) {
+  async function withBusy<T>(fn: () => Promise<T>): Promise<T> {
     setError(null);
     setBusy(true);
     try {
-      await fn();
+      return await fn();
     } finally {
       setBusy(false);
     }
   }
 
-  async function addPlayers(names: string[]) {
+  async function addPlayers(names: string[]): Promise<boolean> {
     const res = await fetch(`/api/tournaments/${tournamentId}/players`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -60,9 +60,10 @@ export default function AdminTournamentPanel({
     const data = await res.json();
     if (!res.ok) {
       setError(data.error ?? "Error al agregar jugadores");
-      return;
+      return false;
     }
     await load();
+    return true;
   }
 
   async function removePlayer(playerId: string) {
@@ -173,6 +174,20 @@ export default function AdminTournamentPanel({
     }
     router.push("/admin");
     router.refresh();
+  }
+
+  async function resetTo(to: "SETUP" | "PAIRS_DONE" | "GROUP_STAGE") {
+    const res = await fetch(`/api/tournaments/${tournamentId}/reset`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ to }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      setError(data.error ?? "No se pudo volver a la etapa anterior");
+      return;
+    }
+    await load();
   }
 
   async function pickWinner(matchId: string, winnerId: string) {
@@ -286,6 +301,14 @@ export default function AdminTournamentPanel({
         onAdd={(names) => withBusy(() => addPlayers(names))}
         onRemove={(id) => withBusy(() => removePlayer(id))}
         onDraw={() => withBusy(drawPairs)}
+        onReopen={() => {
+          if (
+            confirm(
+              "Volver a editar jugadores borra las parejas, las zonas y el cuadro. ¿Continuar?"
+            )
+          )
+            withBusy(() => resetTo("SETUP"));
+        }}
       />
 
       <FinanceSection
@@ -310,6 +333,10 @@ export default function AdminTournamentPanel({
           editable={canEditPairs}
           busy={busy}
           onSave={(pairs) => withBusy(() => savePairs(pairs))}
+          onRedraw={() => {
+            if (confirm("¿Volver a sortear las parejas al azar?"))
+              withBusy(drawPairs);
+          }}
         />
       )}
 
@@ -350,6 +377,22 @@ export default function AdminTournamentPanel({
             onPickWinner={pickWinner}
             busyMatchId={busyMatchId}
           />
+          <div className="mt-4 border-t border-surface-bright pt-3">
+            <button
+              onClick={() => {
+                if (
+                  confirm(
+                    "Esto borra las zonas y el cuadro para volver a la etapa de parejas y formato. ¿Continuar?"
+                  )
+                )
+                  withBusy(() => resetTo("PAIRS_DONE"));
+              }}
+              disabled={busy}
+              className="text-sm font-medium text-on-surface-variant hover:text-primary-fixed hover:underline disabled:opacity-50"
+            >
+              ↩ Rehacer zonas o cambiar formato
+            </button>
+          </div>
         </section>
       )}
 
@@ -389,6 +432,41 @@ export default function AdminTournamentPanel({
             onPickWinner={pickWinner}
             busyMatchId={busyMatchId}
           />
+          <div className="mt-4 flex flex-wrap gap-4 border-t border-surface-bright pt-3">
+            <button
+              onClick={() => {
+                const toGroups = tournament.groups.length > 0;
+                if (
+                  confirm(
+                    toGroups
+                      ? "Esto borra el cuadro final y vuelve a la fase de grupos (los resultados de las zonas se conservan). ¿Continuar?"
+                      : "Esto borra el cuadro para volver a la etapa de parejas. ¿Continuar?"
+                  )
+                )
+                  withBusy(() => resetTo(toGroups ? "GROUP_STAGE" : "PAIRS_DONE"));
+              }}
+              disabled={busy}
+              className="text-sm font-medium text-on-surface-variant hover:text-primary-fixed hover:underline disabled:opacity-50"
+            >
+              ↩ Rehacer cuadro
+            </button>
+            {tournament.groups.length > 0 && (
+              <button
+                onClick={() => {
+                  if (
+                    confirm(
+                      "Esto borra el cuadro y las zonas para volver a la etapa de parejas y formato. ¿Continuar?"
+                    )
+                  )
+                    withBusy(() => resetTo("PAIRS_DONE"));
+                }}
+                disabled={busy}
+                className="text-sm font-medium text-on-surface-variant hover:text-primary-fixed hover:underline disabled:opacity-50"
+              >
+                ↩ Volver a parejas / formato
+              </button>
+            )}
+          </div>
         </section>
       )}
     </div>
@@ -402,33 +480,45 @@ function PlayersSection({
   onAdd,
   onRemove,
   onDraw,
+  onReopen,
 }: {
   tournament: TournamentDetail;
   canDraw: boolean;
   busy: boolean;
-  onAdd: (names: string[]) => void;
+  onAdd: (names: string[]) => Promise<boolean>;
   onRemove: (id: string) => void;
   onDraw: () => void;
+  onReopen: () => void;
 }) {
   const [bulkNames, setBulkNames] = useState("");
   const editable = tournament.status === "SETUP";
 
-  function handleAdd(e: React.FormEvent) {
+  async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
     const names = bulkNames
       .split("\n")
       .map((n) => n.trim())
       .filter(Boolean);
     if (names.length === 0) return;
-    onAdd(names);
-    setBulkNames("");
+    // Sólo limpiamos el campo si se agregaron bien (si no, no perdés lo escrito).
+    const ok = await onAdd(names);
+    if (ok) setBulkNames("");
   }
 
   return (
     <section className="card-border rounded-lg bg-surface-container p-5">
-      <h2 className="mb-3 text-lg font-semibold text-on-surface">
-        Etapa 1 · Jugadores {editable ? "" : "(cerrado)"}
-      </h2>
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <h2 className="text-lg font-semibold text-on-surface">Jugadores</h2>
+        {!editable && (
+          <button
+            onClick={onReopen}
+            disabled={busy}
+            className="text-sm font-medium text-on-surface-variant hover:text-primary-fixed hover:underline disabled:opacity-50"
+          >
+            ↩ Volver a editar jugadores
+          </button>
+        )}
+      </div>
 
       {editable && (
         <form onSubmit={handleAdd} className="mb-4 flex flex-col gap-2">
@@ -677,11 +767,13 @@ function PairsSection({
   editable,
   busy,
   onSave,
+  onRedraw,
 }: {
   tournament: TournamentDetail;
   editable: boolean;
   busy: boolean;
   onSave: (pairs: { player1Id: string; player2Id: string }[]) => void;
+  onRedraw: () => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<[string, string][]>([]);
@@ -722,17 +814,26 @@ function PairsSection({
 
   return (
     <section className="card-border rounded-lg bg-surface-container p-5">
-      <div className="mb-3 flex items-center justify-between">
+      <div className="mb-3 flex items-center justify-between gap-2">
         <h2 className="text-lg font-semibold text-on-surface">
           Parejas sorteadas
         </h2>
         {editable && !editing && (
-          <button
-            onClick={startEditing}
-            className="text-sm font-medium text-primary-fixed hover:underline"
-          >
-            Editar parejas
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={onRedraw}
+              disabled={busy}
+              className="text-sm font-medium text-on-surface-variant hover:text-primary-fixed hover:underline disabled:opacity-50"
+            >
+              🎲 Re-sortear
+            </button>
+            <button
+              onClick={startEditing}
+              className="text-sm font-medium text-primary-fixed hover:underline"
+            >
+              Editar parejas
+            </button>
+          </div>
         )}
       </div>
 
