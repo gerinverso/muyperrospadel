@@ -30,7 +30,15 @@ export default async function AdminDashboard() {
               Hola, {session.adminName} 👋
             </p>
           </div>
-          <LogoutButton />
+          <div className="flex items-center gap-3">
+            <Link
+              href="/admin/jugadores"
+              className="card-border rounded-lg bg-surface-container px-4 py-2 text-sm font-medium text-on-surface hover:bg-surface-container-high"
+            >
+              Jugadores del club
+            </Link>
+            <LogoutButton />
+          </div>
         </header>
 
         <div className="card-border mb-8 rounded-lg bg-surface-container p-5">

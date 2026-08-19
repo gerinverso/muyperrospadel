@@ -7,10 +7,16 @@ export type TournamentStatus =
 
 export type TournamentFormat = "SINGLE_ELIMINATION" | "GROUPS_KO";
 
+/** Jugador global del club (se reutiliza en todos los torneos). */
 export type Player = {
   id: string;
   name: string;
-  tournamentId: string;
+  dni?: string | null;
+};
+
+/** Jugador del listado maestro, con su uso en torneos. */
+export type PlayerWithStats = Player & {
+  _count: { tournaments: number };
 };
 
 export type Pair = {

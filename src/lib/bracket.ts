@@ -64,15 +64,36 @@ function buildBracketSlots(firstRoundPositions: (string | null)[]): BracketSlot[
  * repartidos al azar.
  */
 export function generateBracket(pairIds: string[]): BracketSlot[] {
+  if (pairIds.length < 2) {
+    throw new Error("Se necesitan al menos 2 parejas para armar el cuadro");
+  }
+
   const shuffledPairIds = shuffle(pairIds);
   const totalRounds = Math.ceil(Math.log2(shuffledPairIds.length));
   const bracketSize = 2 ** totalRounds;
+  const matchCount = bracketSize / 2;
   const byesNeeded = bracketSize - shuffledPairIds.length;
 
-  const firstRoundPositions: (string | null)[] = shuffle([
-    ...shuffledPairIds,
-    ...Array(byesNeeded).fill(null),
-  ]);
+  // Los byes van en partidos DISTINTOS: si dos cayeran en el mismo cruce ese
+  // partido quedaria sin ninguna pareja y el cuadro no podria avanzar nunca.
+  // Siempre alcanza, porque la cantidad de byes es menor a la de partidos.
+  const byeMatches = new Set(
+    shuffle(Array.from({ length: matchCount }, (_, i) => i)).slice(0, byesNeeded)
+  );
+
+  const firstRoundPositions: (string | null)[] = [];
+  let nextPair = 0;
+  for (let match = 0; match < matchCount; match++) {
+    if (byeMatches.has(match)) {
+      // Se sortea de que lado del cruce queda el pase libre.
+      const byeOnA = Math.random() < 0.5;
+      firstRoundPositions.push(byeOnA ? null : shuffledPairIds[nextPair++]);
+      firstRoundPositions.push(byeOnA ? shuffledPairIds[nextPair++] : null);
+    } else {
+      firstRoundPositions.push(shuffledPairIds[nextPair++]);
+      firstRoundPositions.push(shuffledPairIds[nextPair++]);
+    }
+  }
 
   return buildBracketSlots(firstRoundPositions);
 }

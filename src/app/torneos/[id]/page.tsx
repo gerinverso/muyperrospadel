@@ -18,7 +18,7 @@ export default async function PublicTournamentPage({
     where: { id },
     relationLoadStrategy: "join",
     include: {
-      players: { orderBy: { createdAt: "asc" } },
+      players: { orderBy: { name: "asc" } },
       pairs: {
         orderBy: { createdAt: "asc" },
         include: { player1: true, player2: true },

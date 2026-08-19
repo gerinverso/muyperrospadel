@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ensureAdmin, unauthorized } from "@/lib/api-utils";
 
+/**
+ * Saca a un jugador del torneo. El jugador sigue existiendo en el listado
+ * maestro del club: sólo se borra su inscripción a este torneo.
+ */
 export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string; playerId: string }> }
@@ -22,6 +26,10 @@ export async function DELETE(
     );
   }
 
-  await prisma.player.delete({ where: { id: playerId } });
+  await prisma.tournament.update({
+    where: { id },
+    data: { players: { disconnect: { id: playerId } } },
+  });
+
   return NextResponse.json({ ok: true });
 }

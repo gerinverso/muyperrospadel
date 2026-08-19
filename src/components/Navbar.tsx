@@ -18,12 +18,18 @@ export default function Navbar() {
             Muy Perros Pádel
           </span>
         </Link>
-        <div className="ml-space-lg hidden gap-space-md md:flex">
+        <div className="ml-space-lg flex gap-space-md">
           <Link
             href="/"
-            className="font-body-md text-body-md border-b-2 border-primary-fixed pb-1 font-bold text-primary-fixed"
+            className="font-body-md text-body-md pb-1 font-bold text-on-surface-variant transition-colors hover:text-primary-fixed"
           >
             Torneos
+          </Link>
+          <Link
+            href="/ranking"
+            className="font-body-md text-body-md pb-1 font-bold text-on-surface-variant transition-colors hover:text-primary-fixed"
+          >
+            Ranking
           </Link>
         </div>
       </div>

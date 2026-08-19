@@ -38,22 +38,33 @@ model Tournament {
   createdAt          DateTime         @default(now())
   updatedAt          DateTime         @updatedAt
 
-  players Player[]
+  players Player[] @relation("TournamentPlayers")
   pairs   Pair[]
   groups  Group[]
   matches Match[]
 }
 
+/// Jugador global del club: vive fuera de los torneos y se reutiliza en todos.
+/// Se anota a cada torneo a traves de la relacion muchos-a-muchos `tournaments`.
 model Player {
-  id           String  @id @default(cuid())
-  name         String
-  tournamentId String
-  tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  id String @id @default(cuid())
 
-  pairAsPlayer1 Pair? @relation("PairPlayer1")
-  pairAsPlayer2 Pair? @relation("PairPlayer2")
+  /// Nombre para mostrar, tal cual lo escribio el organizador.
+  name String
+  /// Nombre normalizado (minusculas, sin espacios de mas). Evita cargar dos
+  /// veces a la misma persona como "Juan Perez" y "juan perez ".
+  nameKey String @unique
+  /// Identificador unico de la persona. Hoy es opcional; la idea es que a
+  /// futuro pase a ser el DNI obligatorio de cada jugador.
+  dni String? @unique
+
+  tournaments Tournament[] @relation("TournamentPlayers")
+
+  pairsAsPlayer1 Pair[] @relation("PairPlayer1")
+  pairsAsPlayer2 Pair[] @relation("PairPlayer2")
 
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Group {
@@ -77,9 +88,11 @@ model Pair {
   tournamentId String
   tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
 
-  player1Id String @unique
+  // Un jugador puede estar en una sola pareja por torneo, pero se repite de
+  // torneo en torneo: por eso la unicidad es por (torneo, jugador).
+  player1Id String
   player1   Player @relation("PairPlayer1", fields: [player1Id], references: [id])
-  player2Id String @unique
+  player2Id String
   player2   Player @relation("PairPlayer2", fields: [player2Id], references: [id])
 
   groupId String?
@@ -90,6 +103,9 @@ model Pair {
   matchesWon Match[] @relation("MatchWinner")
 
   createdAt DateTime @default(now())
+
+  @@unique([tournamentId, player1Id])
+  @@unique([tournamentId, player2Id])
 }
 
 model Match {

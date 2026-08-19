@@ -10,5 +10,8 @@ export default defineConfig({
   },
   datasource: {
     url: process.env["DATABASE_URL"],
+    // Base descartable que Prisma usa para validar migraciones en desarrollo.
+    // Sólo hace falta localmente; en producción no se define.
+    shadowDatabaseUrl: process.env["SHADOW_DATABASE_URL"],
   },
 });
