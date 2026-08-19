@@ -54,11 +54,10 @@ export default async function RankingPage({
       <header className="mb-space-lg flex flex-col items-start justify-between gap-space-md md:flex-row md:items-end">
         <div>
           <h1 className="font-headline-lg-mobile text-headline-lg-mobile uppercase tracking-tight text-primary-fixed md:font-headline-lg md:text-headline-lg">
-            Ranking {season}
+            MUY PERROS PADEL RANKING {season}
           </h1>
           <p className="font-body-lg text-body-lg mt-2 max-w-2xl text-on-surface-variant">
-            Puntos acumulados por los jugadores en los torneos terminados de la
-            temporada.
+            PUNTOS DE LOS VAGOS, EL CULO DE MORALES ES EL PREMIO.
           </p>
         </div>
 
