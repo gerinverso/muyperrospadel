@@ -135,11 +135,6 @@ export default async function RankingPage({
                         <span className="font-semibold text-on-surface">
                           {row.player.name}
                         </span>
-                        <span className="mt-0.5 block text-xs text-on-surface-variant">
-                          {row.history
-                            .map((h) => STAGE_LABELS[h.stage])
-                            .join(" · ")}
-                        </span>
                       </td>
                       <td className="px-4 py-3 text-right">
                         <span className="font-headline-md text-headline-md text-primary-fixed">
