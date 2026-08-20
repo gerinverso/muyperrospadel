@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import PlayersRoster from "@/components/PlayersRoster";
+import DuplicatePlayers from "@/components/DuplicatePlayers";
 
 export default async function AdminPlayersPage() {
   const session = await getSession();
@@ -28,6 +29,8 @@ export default async function AdminPlayersPage() {
       </header>
 
       <PlayersRoster />
+
+      <DuplicatePlayers />
     </div>
   );
 }

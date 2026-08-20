@@ -66,16 +66,38 @@ export async function POST(
 
   // Los nombres escritos a mano se resuelven contra el listado maestro para no
   // duplicar personas: mismo nombre normalizado => mismo jugador.
+  //
+  // Desde que el DNI es la identidad, el nombre normalizado dejo de ser unico:
+  // puede haber dos personas distintas que se llamen igual. Cuando pasa, no hay
+  // forma de adivinar a cual se referia, asi que se pide elegirlo del listado.
   const seenKeys = new Set<string>();
   for (const name of names) {
     const nameKey = normalizeName(name);
     if (seenKeys.has(nameKey)) continue;
     seenKeys.add(nameKey);
 
-    const player = await prisma.player.upsert({
+    const matches = await prisma.player.findMany({
       where: { nameKey },
-      update: {},
-      create: { name, nameKey },
+      select: { id: true, name: true, dni: true },
+      orderBy: { createdAt: "asc" },
+    });
+
+    if (matches.length > 1) {
+      return NextResponse.json(
+        {
+          error: `Hay ${matches.length} jugadores llamados "${name}". Elegí el que va desde el listado en vez de escribirlo.`,
+        },
+        { status: 409 }
+      );
+    }
+
+    if (matches.length === 1) {
+      idsToConnect.add(matches[0].id);
+      continue;
+    }
+
+    const player = await prisma.player.create({
+      data: { name, nameKey },
       select: { id: true },
     });
     idsToConnect.add(player.id);

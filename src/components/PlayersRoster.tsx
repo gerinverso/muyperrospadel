@@ -113,8 +113,8 @@ export default function PlayersRoster() {
           </button>
         </form>
         <p className="mt-2 text-xs text-on-surface-variant">
-          El DNI es opcional por ahora. Más adelante va a ser el identificador
-          único de cada jugador.
+          El DNI es lo que identifica a cada jugador. Sigue siendo opcional, pero
+          sin él no hay forma de diferenciar a dos personas que se llamen igual.
         </p>
       </section>
 

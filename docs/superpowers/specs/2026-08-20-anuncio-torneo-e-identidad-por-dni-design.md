@@ -117,7 +117,7 @@ export function normalizeName(name: string): string {
 ### 4. Consecuencia obligatoria: los upserts por nombre se rompen
 
 Sacar el `@unique` invalida `where: { nameKey }` en operaciones que exigen
-clave única. Hay que reescribir dos lugares:
+clave única. Hay que reescribir tres lugares (el tercero apareció al compilar):
 
 **`src/app/api/tournaments/[id]/players/route.ts`** — carga de nombres a mano
 del admin. El `prisma.player.upsert({ where: { nameKey } })` pasa a
@@ -133,6 +133,11 @@ del admin. El `prisma.player.upsert({ where: { nameKey } })` pasa a
 
 - sin DNI en el body → sigue el 409 de hoy ("Ya existe un jugador llamado X").
 - con un DNI que no está en uso → **deja crear**: es un homónimo verificado.
+
+**`src/app/api/players/[playerId]/route.ts`** — el PATCH de edición, que también
+busca `findUnique({ where: { nameKey } })` para rechazar renombres a un nombre
+ocupado. Misma regla que el alta, con el DNI resuelto primero porque es lo que
+decide si el nombre repetido se acepta.
 
 ### 5. Inscripción pública
 
@@ -182,9 +187,16 @@ transacción:
 Dos guardas que **bloquean la fusión** con un 409 explicativo:
 
 - **Ambos tienen DNI distinto** → no son la misma persona.
-- **Ambos participaron del mismo torneo** → violaría
-  `@@unique([tournamentId, player1Id])` de `Pair`, y además implica que son dos
-  personas distintas. El error nombra el torneo en conflicto.
+- **Ambos tuvieron pareja en el mismo torneo** → violaría
+  `@@unique([tournamentId, player1Id])` de `Pair`, y además implica que jugaron
+  por separado, o sea que son dos personas. El error nombra el torneo.
+
+Corregido durante la implementación: la guarda mira las **parejas**, no las
+inscripciones. Bloquear por compartir torneo hacía imposible el caso más común
+—el administrador anota a mano al jugador viejo y después esa misma persona se
+anota sola al mismo torneo, antes del sorteo—, que es justamente el que hay que
+poder unificar. Sin parejas armadas la fusión es válida y deduplica la
+inscripción.
 
 El ranking se corrige solo: `computeRanking` en `src/lib/ranking.ts` agrupa por
 `player.id` leyendo las parejas, así que reasignar `Pair` alcanza.

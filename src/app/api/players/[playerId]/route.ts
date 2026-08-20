@@ -24,26 +24,7 @@ export async function PATCH(
   const body = await req.json().catch(() => null);
   const data: { name?: string; nameKey?: string; dni?: string | null } = {};
 
-  if (typeof body?.name === "string") {
-    const name = body.name.trim();
-    if (!name) {
-      return NextResponse.json(
-        { error: "El nombre no puede quedar vacío" },
-        { status: 400 }
-      );
-    }
-    const nameKey = normalizeName(name);
-    const other = await prisma.player.findUnique({ where: { nameKey } });
-    if (other && other.id !== playerId) {
-      return NextResponse.json(
-        { error: `Ya existe un jugador llamado "${other.name}"` },
-        { status: 409 }
-      );
-    }
-    data.name = name;
-    data.nameKey = nameKey;
-  }
-
+  // El DNI va primero porque decide si se puede aceptar un nombre repetido.
   if (body?.dni !== undefined) {
     const dni = normalizeDni(typeof body.dni === "string" ? body.dni : null);
     if (dni) {
@@ -56,6 +37,35 @@ export async function PATCH(
       }
     }
     data.dni = dni;
+  }
+
+  const finalDni = "dni" in data ? data.dni : player.dni;
+
+  if (typeof body?.name === "string") {
+    const name = body.name.trim();
+    if (!name) {
+      return NextResponse.json(
+        { error: "El nombre no puede quedar vacío" },
+        { status: 400 }
+      );
+    }
+    // El nombre repetido ya no es un error en si mismo: dos personas pueden
+    // llamarse igual y se diferencian por el DNI. Sin DNI no habria forma de
+    // distinguirlas, asi que ahi si se frena.
+    const nameKey = normalizeName(name);
+    const other = await prisma.player.findFirst({
+      where: { nameKey, id: { not: playerId } },
+    });
+    if (other && !finalDni) {
+      return NextResponse.json(
+        {
+          error: `Ya existe un jugador llamado "${other.name}". Si es otra persona, cargale el DNI para diferenciarlos.`,
+        },
+        { status: 409 }
+      );
+    }
+    data.name = name;
+    data.nameKey = nameKey;
   }
 
   const updated = await prisma.player.update({

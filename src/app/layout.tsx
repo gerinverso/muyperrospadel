@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Montserrat, JetBrains_Mono } from "next/font/google";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import TournamentAnnouncement from "@/components/TournamentAnnouncement";
 import "./globals.css";
 
 const inter = Inter({
@@ -39,6 +40,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         />
       </head>
       <body className="flex min-h-full flex-col bg-background text-on-background">
+        <TournamentAnnouncement />
         <Navbar />
         {children}
         <Footer />

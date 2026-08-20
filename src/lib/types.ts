@@ -52,6 +52,9 @@ export type TournamentSummary = {
   groupsCount: number | null;
   qualifiersPerGroup: number | null;
   createdAt: string;
+  /** ISO de la fecha de inicio, o null si todavía no se definió. */
+  startsAt: string | null;
+  registrationOpen: boolean;
   registrationFee: string | null;
   courtCost: string | null;
   _count?: { players: number };

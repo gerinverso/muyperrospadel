@@ -30,14 +30,6 @@ export async function POST(req: NextRequest) {
 
   const nameKey = normalizeName(name);
 
-  const existing = await prisma.player.findUnique({ where: { nameKey } });
-  if (existing) {
-    return NextResponse.json(
-      { error: `Ya existe un jugador llamado "${existing.name}"` },
-      { status: 409 }
-    );
-  }
-
   if (dni) {
     const withDni = await prisma.player.findUnique({ where: { dni } });
     if (withDni) {
@@ -46,6 +38,19 @@ export async function POST(req: NextRequest) {
         { status: 409 }
       );
     }
+  }
+
+  // El nombre repetido ya no es un error en si mismo: dos personas distintas
+  // pueden llamarse igual y se diferencian por el DNI. Pero sin DNI no habria
+  // forma de distinguirlas despues, asi que ahi si se frena.
+  const existing = await prisma.player.findFirst({ where: { nameKey } });
+  if (existing && !dni) {
+    return NextResponse.json(
+      {
+        error: `Ya existe un jugador llamado "${existing.name}". Si es otra persona, cargale el DNI para diferenciarlos.`,
+      },
+      { status: 409 }
+    );
   }
 
   const player = await prisma.player.create({
