@@ -85,9 +85,12 @@ export default async function TournamentHero() {
           )}
         </div>
 
-        <h1 className="font-headline-lg-mobile text-headline-lg-mobile uppercase tracking-tight text-on-surface md:font-display-lg md:text-display-lg">
+        {/* h2 y no h1: el h1 de la portada es "Torneos activos", que es de lo
+            que trata la pagina. Este anuncio es una seccion destacada adentro,
+            por mas que visualmente sea lo primero y lo mas grande. */}
+        <h2 className="font-headline-lg-mobile text-headline-lg-mobile uppercase tracking-tight text-on-surface md:font-display-lg md:text-display-lg">
           {tournament.name}
-        </h1>
+        </h2>
 
         <dl className="flex flex-wrap gap-x-space-lg gap-y-space-sm border-t border-outline-variant pt-space-sm">
           {tournament.startsAt && (

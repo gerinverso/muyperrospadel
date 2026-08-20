@@ -93,6 +93,8 @@ function MatchCard({
   const canPick =
     Boolean(onPickWinner) && Boolean(match.pairA) && Boolean(match.pairB);
   const decided = Boolean(match.winner);
+  // Cruce con una sola pareja y ganador: paso libre, no hay rival por venir.
+  const bye = decided && (!match.pairA || !match.pairB);
 
   return (
     <div
@@ -106,6 +108,7 @@ function MatchCard({
         dimmed={decided && match.winner?.id !== match.pairA?.id}
         clickable={canPick}
         disabled={busy}
+        bye={bye}
         onClick={() => match.pairA && onPickWinner?.(match.id, match.pairA.id)}
       />
       <div className="flex items-center gap-2 px-2">
@@ -121,6 +124,7 @@ function MatchCard({
         dimmed={decided && match.winner?.id !== match.pairB?.id}
         clickable={canPick}
         disabled={busy}
+        bye={bye}
         onClick={() => match.pairB && onPickWinner?.(match.id, match.pairB.id)}
       />
     </div>
@@ -133,6 +137,7 @@ function PairRow({
   dimmed,
   clickable,
   disabled,
+  bye,
   onClick,
 }: {
   pair: Match["pairA"];
@@ -140,9 +145,10 @@ function PairRow({
   dimmed: boolean;
   clickable: boolean;
   disabled?: boolean;
+  bye?: boolean;
   onClick: () => void;
 }) {
-  const label = pairLabel(pair);
+  const label = pair ? pairLabel(pair) : bye ? "Libre" : "A definir";
   const baseClasses =
     "flex w-full items-center gap-1.5 px-3 py-2 text-left text-sm";
   const stateClasses = isWinner

@@ -1,7 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ensureAdmin, unauthorized } from "@/lib/api-utils";
+import { buildPairs, validatePairDrafts, type PairDraft } from "@/lib/pairing";
+import { loadTournamentDetail } from "@/lib/tournament-query";
 
+/**
+ * Define las parejas del torneo. Reemplaza al viejo /draw-pairs porque los tres
+ * casos son el mismo: guardar la lista final de parejas.
+ *
+ *   { pairs: [], drawRest: true }                -> sortea todas
+ *   { pairs: [[a, b]], drawRest: true }          -> fija esa y sortea el resto
+ *   { pairs: [[a, b], [c, d]], drawRest: false } -> las forma el organizador
+ *
+ * Los jugadores que quedan afuera (porque son impares o porque el organizador
+ * no los emparejó) no son un error: se devuelven en `unpaired` y el torneo se
+ * juega con las parejas que se armaron.
+ */
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -13,23 +27,25 @@ export async function POST(
 
   const tournament = await prisma.tournament.findUnique({
     where: { id },
-    include: { players: true },
+    include: { players: { select: { id: true } } },
   });
   if (!tournament) {
     return NextResponse.json({ error: "Torneo no encontrado" }, { status: 404 });
   }
-  if (tournament.status !== "PAIRS_DONE") {
+  // Se pueden definir en SETUP (primera vez) o rehacer en PAIRS_DONE. Una vez
+  // armadas las zonas o el cuadro hay que volver atrás con /reset.
+  if (tournament.status !== "SETUP" && tournament.status !== "PAIRS_DONE") {
     return NextResponse.json(
       {
         error:
-          "Las parejas solo se pueden editar después del sorteo y antes de armar zonas o cuadro",
+          "Ya se armaron zonas o cuadro. Volvé a la etapa de parejas para cambiarlas.",
       },
       { status: 409 }
     );
   }
 
   const body = await req.json().catch(() => null);
-  const rawPairs = body?.pairs;
+  const rawPairs = body?.pairs ?? [];
   if (!Array.isArray(rawPairs)) {
     return NextResponse.json(
       { error: "Formato de parejas inválido" },
@@ -37,66 +53,53 @@ export async function POST(
     );
   }
 
-  const pairs: { player1Id: string; player2Id: string }[] = [];
-  for (const p of rawPairs) {
-    if (typeof p?.player1Id !== "string" || typeof p?.player2Id !== "string") {
+  // Se aceptan las dos formas: [[a, b]] y [{ player1Id, player2Id }].
+  const fixed: PairDraft[] = [];
+  for (const entry of rawPairs) {
+    if (Array.isArray(entry)) {
+      fixed.push([entry[0], entry[1]]);
+    } else if (entry && typeof entry === "object") {
+      fixed.push([entry.player1Id, entry.player2Id]);
+    } else {
       return NextResponse.json(
         { error: "Cada pareja necesita dos jugadores" },
         { status: 400 }
       );
     }
-    pairs.push({ player1Id: p.player1Id, player2Id: p.player2Id });
   }
 
-  const validPlayerIds = new Set(tournament.players.map((p) => p.id));
-  const usedPlayerIds = new Set<string>();
-  for (const { player1Id, player2Id } of pairs) {
-    if (player1Id === player2Id) {
-      return NextResponse.json(
-        { error: "Una pareja no puede tener el mismo jugador dos veces" },
-        { status: 400 }
-      );
-    }
-    for (const playerId of [player1Id, player2Id]) {
-      if (!validPlayerIds.has(playerId)) {
-        return NextResponse.json(
-          { error: "Hay un jugador que no pertenece a este torneo" },
-          { status: 400 }
-        );
-      }
-      if (usedPlayerIds.has(playerId)) {
-        return NextResponse.json(
-          { error: "Un jugador no puede estar en más de una pareja" },
-          { status: 400 }
-        );
-      }
-      usedPlayerIds.add(playerId);
-    }
+  const playerIds = tournament.players.map((p) => p.id);
+  const invalid = validatePairDrafts(playerIds, fixed);
+  if (invalid) {
+    return NextResponse.json({ error: invalid }, { status: 400 });
   }
 
-  if (usedPlayerIds.size !== tournament.players.length) {
+  const drawRest = body?.drawRest === true;
+  const { pairs, unpaired } = buildPairs(playerIds, fixed, drawRest);
+
+  if (pairs.length < 2) {
     return NextResponse.json(
-      { error: "Todos los jugadores deben quedar asignados a una pareja" },
+      { error: "Se necesitan al menos 2 parejas para jugar un torneo" },
       { status: 400 }
     );
   }
 
+  const pairingMode = body?.mode === "MANUAL" ? "MANUAL" : "DRAW";
+
   await prisma.$transaction([
     prisma.pair.deleteMany({ where: { tournamentId: id } }),
-    ...pairs.map(({ player1Id, player2Id }) =>
-      prisma.pair.create({
-        data: { tournamentId: id, player1Id, player2Id },
-      })
+    ...pairs.map(([player1Id, player2Id]) =>
+      prisma.pair.create({ data: { tournamentId: id, player1Id, player2Id } })
     ),
+    prisma.tournament.update({
+      where: { id },
+      // Definir las parejas cierra las inscripciones: ya nadie puede sumarse,
+      // así que dejar el flag prendido solo haría que el panel diga que están
+      // abiertas cuando no lo están.
+      data: { status: "PAIRS_DONE", registrationOpen: false, pairingMode },
+    }),
   ]);
 
-  const updated = await prisma.tournament.findUnique({
-    where: { id },
-    relationLoadStrategy: "join",
-    include: {
-      pairs: { include: { player1: true, player2: true } },
-    },
-  });
-
-  return NextResponse.json(updated);
+  const updated = await loadTournamentDetail(id);
+  return NextResponse.json({ ...updated, unpaired });
 }

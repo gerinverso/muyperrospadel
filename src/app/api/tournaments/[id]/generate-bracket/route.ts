@@ -1,9 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ensureAdmin, unauthorized } from "@/lib/api-utils";
-import { generateBracket, seedBracket, nextMatchPosition } from "@/lib/bracket";
-import { computeGroupStandings } from "@/lib/groups";
+import { generateBracket, seedBracket, type BracketSlot } from "@/lib/bracket";
+import { computeQualifiers, seedQualifiers } from "@/lib/groups";
+import { loadTournamentDetail } from "@/lib/tournament-query";
 
+/**
+ * Arma el cuadro de eliminación.
+ *
+ * Con fase de grupos toma los clasificados de cada zona (respetando el número
+ * propio de cada una) y los siembra: los pases libres caen en los mejores y se
+ * evita que dos parejas de la misma zona se cruzen de entrada. Sin fase de
+ * grupos se sortea el cruce.
+ *
+ * Los pases libres vienen ya resueltos y ubicados en la ronda siguiente desde
+ * `@/lib/bracket`, así que no hay que propagar nada después de guardar.
+ */
 export async function POST(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -16,10 +28,10 @@ export async function POST(
   const tournament = await prisma.tournament.findUnique({
     where: { id },
     include: {
-      pairs: true,
+      pairs: { select: { id: true } },
       groups: {
         orderBy: { index: "asc" },
-        include: { pairs: true, matches: true },
+        include: { pairs: { select: { id: true } }, matches: true },
       },
     },
   });
@@ -27,7 +39,7 @@ export async function POST(
     return NextResponse.json({ error: "Torneo no encontrado" }, { status: 404 });
   }
 
-  let qualifierIds: string[];
+  let slots: BracketSlot[];
 
   if (tournament.format === "GROUPS_KO") {
     if (tournament.status !== "GROUP_STAGE") {
@@ -49,36 +61,41 @@ export async function POST(
       );
     }
 
-    const qualifiersPerGroup = tournament.qualifiersPerGroup ?? 1;
-    const standingsPerGroup = tournament.groups.map((group) =>
-      computeGroupStandings(
-        group.pairs.map((p) => p.id),
-        group.matches
-      )
+    const zones = computeQualifiers(
+      tournament.groups.map((group) => ({
+        id: group.id,
+        index: group.index,
+        pairIds: group.pairs.map((p) => p.id),
+        matches: group.matches.map((m) => ({
+          pairAId: m.pairAId,
+          pairBId: m.pairBId,
+          winnerId: m.winnerId,
+        })),
+        qualifiers: group.qualifiers,
+        tiebreakOrder: group.tiebreakOrder,
+      })),
+      tournament.qualifiersPerGroup ?? 1
     );
 
-    // Se intercalan los clasificados por puesto (todos los 1eros, luego los
-    // 2dos, etc.) para que el seed de cuadro cruce zonas distintas primero.
-    qualifierIds = [];
-    for (let rank = 0; rank < qualifiersPerGroup; rank++) {
-      for (const standings of standingsPerGroup) {
-        const row = standings[rank];
-        if (row) qualifierIds.push(row.pairId);
-      }
-    }
-
-    if (qualifierIds.length < 2) {
+    const seeded = seedQualifiers(zones);
+    if (seeded.length < 2) {
       return NextResponse.json(
         { error: "No hay suficientes clasificados para armar el cuadro" },
         { status: 400 }
       );
     }
+
+    const zoneByPair = new Map(seeded.map((s) => [s.pairId, s.groupIndex]));
+    slots = seedBracket(
+      seeded.map((s) => s.pairId),
+      (pairId) => zoneByPair.get(pairId)
+    );
   } else {
     if (tournament.status !== "PAIRS_DONE") {
       return NextResponse.json(
         {
           error:
-            "El cuadro ya fue generado o todavía no se sortearon las parejas",
+            "El cuadro ya fue generado o todavía no se definieron las parejas",
         },
         { status: 409 }
       );
@@ -89,82 +106,30 @@ export async function POST(
         { status: 400 }
       );
     }
-    qualifierIds = tournament.pairs.map((p) => p.id);
+    slots = generateBracket(tournament.pairs.map((p) => p.id));
   }
 
-  const slots =
-    tournament.format === "GROUPS_KO"
-      ? seedBracket(qualifierIds)
-      : generateBracket(qualifierIds);
+  // Un cuadro de 2 parejas no puede venir con la final resuelta, pero el estado
+  // se calcula igual desde el resultado para no depender de eso.
+  const totalRounds = Math.max(...slots.map((s) => s.round));
+  const champion = slots.find((s) => s.round === totalRounds)?.winnerId;
 
   await prisma.$transaction([
-    ...slots.map((s) =>
-      prisma.match.create({
-        data: {
-          tournamentId: id,
-          round: s.round,
-          slot: s.slot,
-          pairAId: s.pairAId,
-          pairBId: s.pairBId,
-          winnerId: s.winnerId,
-        },
-      })
-    ),
+    prisma.match.createMany({
+      data: slots.map((s) => ({
+        tournamentId: id,
+        round: s.round,
+        slot: s.slot,
+        pairAId: s.pairAId,
+        pairBId: s.pairBId,
+        winnerId: s.winnerId,
+      })),
+    }),
     prisma.tournament.update({
       where: { id },
-      data: { status: "IN_PROGRESS" },
+      data: { status: champion ? "FINISHED" : "IN_PROGRESS" },
     }),
   ]);
 
-  // Propaga los "byes" (pases libres) de la primera ronda hacia la siguiente.
-  const byes = slots.filter((s) => s.round === 1 && s.winnerId);
-  for (const bye of byes) {
-    await propagateWinner(id, bye.round, bye.slot, bye.winnerId!);
-  }
-
-  const updated = await prisma.tournament.findUnique({
-    where: { id },
-    relationLoadStrategy: "join",
-    include: {
-      matches: {
-        where: { groupId: null },
-        orderBy: [{ round: "asc" }, { slot: "asc" }],
-        include: {
-          pairA: { include: { player1: true, player2: true } },
-          pairB: { include: { player1: true, player2: true } },
-          winner: { include: { player1: true, player2: true } },
-        },
-      },
-    },
-  });
-
-  return NextResponse.json(updated);
-}
-
-async function propagateWinner(
-  tournamentId: string,
-  round: number,
-  slot: number,
-  winnerId: string
-) {
-  const totalRounds = await prisma.match.aggregate({
-    where: { tournamentId, groupId: null },
-    _max: { round: true },
-  });
-  if (round >= (totalRounds._max.round ?? round)) return;
-
-  const next = nextMatchPosition(round, slot);
-  const data =
-    next.position === "A" ? { pairAId: winnerId } : { pairBId: winnerId };
-
-  await prisma.match.update({
-    where: {
-      tournamentId_round_slot: {
-        tournamentId,
-        round: next.round,
-        slot: next.slot,
-      },
-    },
-    data,
-  });
+  return NextResponse.json(await loadTournamentDetail(id));
 }

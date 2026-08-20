@@ -1,8 +1,8 @@
 import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
-import { prisma } from "@/lib/prisma";
-import { pairLabel, statusLabels } from "@/lib/types";
+import { loadTournamentDetail } from "@/lib/tournament-query";
+import { pairLabel, pairingModeLabels, statusLabels } from "@/lib/types";
 import BracketView from "@/components/BracketView";
 import GroupsView from "@/components/GroupsView";
 import type { Match } from "@/lib/types";
@@ -14,40 +14,7 @@ export default async function PublicTournamentPage({
 }) {
   const { id } = await params;
 
-  const tournament = await prisma.tournament.findUnique({
-    where: { id },
-    relationLoadStrategy: "join",
-    include: {
-      players: { orderBy: { name: "asc" } },
-      pairs: {
-        orderBy: { createdAt: "asc" },
-        include: { player1: true, player2: true },
-      },
-      groups: {
-        orderBy: { index: "asc" },
-        include: {
-          pairs: { include: { player1: true, player2: true } },
-          matches: {
-            orderBy: { slot: "asc" },
-            include: {
-              pairA: { include: { player1: true, player2: true } },
-              pairB: { include: { player1: true, player2: true } },
-              winner: { include: { player1: true, player2: true } },
-            },
-          },
-        },
-      },
-      matches: {
-        where: { groupId: null },
-        orderBy: [{ round: "asc" }, { slot: "asc" }],
-        include: {
-          pairA: { include: { player1: true, player2: true } },
-          pairB: { include: { player1: true, player2: true } },
-          winner: { include: { player1: true, player2: true } },
-        },
-      },
-    },
-  });
+  const tournament = await loadTournamentDetail(id);
 
   if (!tournament) notFound();
 
@@ -121,9 +88,12 @@ export default async function PublicTournamentPage({
 
       {tournament.pairs.length > 0 && (
         <section className="card-border rounded-lg bg-surface-container p-5">
-          <h2 className="mb-3 text-lg font-semibold text-on-surface">
+          <h2 className="mb-1 text-lg font-semibold text-on-surface">
             Parejas
           </h2>
+          <p className="mb-3 text-sm text-on-surface-variant">
+            {pairingModeLabels[tournament.pairingMode]}
+          </p>
           <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {tournament.pairs.map((pair, i) => (
               <li

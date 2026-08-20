@@ -4,14 +4,43 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type {
-  PlayerWithStats,
+  PairingMode,
   TournamentDetail,
   TournamentFormat,
   TournamentStatus,
 } from "@/lib/types";
-import { statusLabels, formatLabels, pairLabel } from "@/lib/types";
+import { statusLabels } from "@/lib/types";
+import { computeQualifiers, toGroupMatchResults } from "@/lib/groups";
 import BracketView from "@/components/BracketView";
-import GroupsView from "@/components/GroupsView";
+import GroupsView, { type GroupSettings } from "@/components/GroupsView";
+import PlayersSection from "@/components/admin/PlayersSection";
+import RegistrationSection from "@/components/admin/RegistrationSection";
+import FinanceSection from "@/components/admin/FinanceSection";
+import FormatSection from "@/components/admin/FormatSection";
+import PairingSection from "@/components/admin/PairingSection";
+import ZoneDraftSection from "@/components/admin/ZoneDraftSection";
+
+/**
+ * Cuántas parejas clasifican con la configuración actual de las zonas y de qué
+ * tamaño queda el cuadro. Usa la misma función que el servidor, así lo que
+ * anuncia el panel es exactamente lo que se va a armar.
+ */
+function qualifierSummary(tournament: TournamentDetail) {
+  const zones = computeQualifiers(
+    tournament.groups.map((group) => ({
+      id: group.id,
+      index: group.index,
+      pairIds: group.pairs.map((p) => p.id),
+      matches: toGroupMatchResults(group.matches),
+      qualifiers: group.qualifiers,
+      tiebreakOrder: group.tiebreakOrder,
+    })),
+    tournament.qualifiersPerGroup ?? 1
+  );
+  const count = zones.reduce((total, zone) => total + zone.qualifiers, 0);
+  const bracketSize = count >= 2 ? 2 ** Math.ceil(Math.log2(count)) : 0;
+  return { count, bracketSize, byes: Math.max(0, bracketSize - count) };
+}
 
 export default function AdminTournamentPanel({
   tournamentId,
@@ -24,6 +53,7 @@ export default function AdminTournamentPanel({
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [busyMatchId, setBusyMatchId] = useState<string | null>(null);
+  const [formatWarnings, setFormatWarnings] = useState<string[]>([]);
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/tournaments/${tournamentId}`, {
@@ -42,91 +72,77 @@ export default function AdminTournamentPanel({
     load();
   }, [load]);
 
-  async function withBusy<T>(fn: () => Promise<T>): Promise<T> {
-    setError(null);
-    setBusy(true);
-    try {
-      return await fn();
-    } finally {
-      setBusy(false);
-    }
-  }
+  /**
+   * Todas las acciones del panel son POST a un endpoint del torneo que
+   * devuelven el torneo actualizado. Este helper concentra el manejo de error y
+   * la recarga: antes cada acción repetía las mismas quince líneas.
+   */
+  const send = useCallback(
+    async (
+      path: string,
+      body?: unknown,
+      errorMessage = "No se pudo completar la acción"
+    ): Promise<Record<string, unknown> | null> => {
+      setError(null);
+      setBusy(true);
+      try {
+        const res = await fetch(`/api/tournaments/${tournamentId}${path}`, {
+          method: "POST",
+          headers:
+            body === undefined ? undefined : { "Content-Type": "application/json" },
+          body: body === undefined ? undefined : JSON.stringify(body),
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok) {
+          setError(data?.error ?? errorMessage);
+          return null;
+        }
+        await load();
+        return data ?? {};
+      } finally {
+        setBusy(false);
+      }
+    },
+    [tournamentId, load]
+  );
 
   async function addPlayers(payload: {
     names?: string[];
     playerIds?: string[];
   }): Promise<boolean> {
-    const res = await fetch(`/api/tournaments/${tournamentId}/players`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      setError(data.error ?? "Error al agregar jugadores");
-      return false;
-    }
-    await load();
-    return true;
+    const data = await send("/players", payload, "Error al agregar jugadores");
+    return data !== null;
   }
 
   async function removePlayer(playerId: string) {
-    const res = await fetch(
-      `/api/tournaments/${tournamentId}/players/${playerId}`,
-      { method: "DELETE" }
+    setError(null);
+    setBusy(true);
+    try {
+      const res = await fetch(
+        `/api/tournaments/${tournamentId}/players/${playerId}`,
+        { method: "DELETE" }
+      );
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error ?? "Error al quitar jugador");
+        return;
+      }
+      await load();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function savePairs(
+    pairs: [string, string][],
+    drawRest: boolean,
+    mode: PairingMode
+  ) {
+    await send(
+      "/pairs",
+      { pairs, drawRest, mode },
+      "Error al guardar las parejas"
     );
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      setError(data.error ?? "Error al quitar jugador");
-      return;
-    }
-    await load();
-  }
-
-  async function drawPairs() {
-    const res = await fetch(`/api/tournaments/${tournamentId}/draw-pairs`, {
-      method: "POST",
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      setError(data.error ?? "Error al sortear parejas");
-      return;
-    }
-    await load();
-  }
-
-  async function saveFinance(registrationFee: number, courtCost: number) {
-    const res = await fetch(`/api/tournaments/${tournamentId}/finance`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ registrationFee, courtCost }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      setError(data.error ?? "Error al guardar los montos");
-      return;
-    }
-    await load();
-  }
-
-  async function saveRegistration(payload: {
-    startsAt?: string | null;
-    registrationOpen?: boolean;
-  }) {
-    const res = await fetch(`/api/tournaments/${tournamentId}/registration`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      setError(data.error ?? "Error al guardar las inscripciones");
-      return;
-    }
-    await load();
-    // El anuncio vive en el layout, fuera de este componente: sin refresh
-    // seguiria mostrando el estado viejo.
-    router.refresh();
   }
 
   async function saveFormat(
@@ -134,106 +150,58 @@ export default function AdminTournamentPanel({
     groupsCount?: number,
     qualifiersPerGroup?: number
   ) {
-    const res = await fetch(`/api/tournaments/${tournamentId}/format`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ format, groupsCount, qualifiersPerGroup }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      setError(data.error ?? "Error al guardar el formato");
-      return;
-    }
-    await load();
-  }
-
-  async function savePairs(pairs: { player1Id: string; player2Id: string }[]) {
-    const res = await fetch(`/api/tournaments/${tournamentId}/pairs`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pairs }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      setError(data.error ?? "Error al guardar las parejas");
-      return;
-    }
-    await load();
-  }
-
-  async function generateGroups() {
-    const res = await fetch(
-      `/api/tournaments/${tournamentId}/generate-groups`,
-      { method: "POST" }
+    const data = await send(
+      "/format",
+      { format, groupsCount, qualifiersPerGroup },
+      "Error al guardar el formato"
     );
-    const data = await res.json();
-    if (!res.ok) {
-      setError(data.error ?? "Error al armar las zonas");
-      return;
-    }
-    await load();
-  }
-
-  async function generateBracket() {
-    const res = await fetch(
-      `/api/tournaments/${tournamentId}/generate-bracket`,
-      { method: "POST" }
+    setFormatWarnings(
+      Array.isArray(data?.warnings) ? (data.warnings as string[]) : []
     );
-    const data = await res.json();
-    if (!res.ok) {
-      setError(data.error ?? "Error al armar el cuadro");
-      return;
-    }
-    await load();
   }
 
-  async function deleteTournament() {
-    const res = await fetch(`/api/tournaments/${tournamentId}`, {
-      method: "DELETE",
-    });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      setError(data.error ?? "No se pudo borrar el torneo");
-      return;
-    }
-    router.push("/admin");
-    router.refresh();
-  }
-
-  async function resetTo(to: "SETUP" | "PAIRS_DONE" | "GROUP_STAGE") {
-    const res = await fetch(`/api/tournaments/${tournamentId}/reset`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ to }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      setError(data.error ?? "No se pudo volver a la etapa anterior");
-      return;
-    }
-    await load();
+  async function saveRegistration(payload: {
+    startsAt?: string | null;
+    registrationOpen?: boolean;
+  }) {
+    const data = await send(
+      "/registration",
+      payload,
+      "Error al guardar las inscripciones"
+    );
+    // El anuncio vive en el layout, fuera de este componente: sin refresh
+    // seguiría mostrando el estado viejo.
+    if (data) router.refresh();
   }
 
   async function pickWinner(matchId: string, winnerId: string) {
     setBusyMatchId(matchId);
-    setError(null);
     try {
-      const res = await fetch(
-        `/api/tournaments/${tournamentId}/matches/${matchId}/advance`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ winnerId }),
-        }
+      await send(
+        `/matches/${matchId}/advance`,
+        { winnerId },
+        "Error al registrar el ganador"
       );
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? "Error al registrar el ganador");
-        return;
-      }
-      await load();
     } finally {
       setBusyMatchId(null);
+    }
+  }
+
+  async function deleteTournament() {
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/tournaments/${tournamentId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error ?? "No se pudo borrar el torneo");
+        return;
+      }
+      router.push("/admin");
+      router.refresh();
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -254,20 +222,26 @@ export default function AdminTournamentPanel({
 
   const status = tournament.status as TournamentStatus;
   const playerCount = tournament.players.length;
-  const canDraw = status === "SETUP" && playerCount >= 4 && playerCount % 2 === 0;
-  const canEditFormat = status === "SETUP" || status === "PAIRS_DONE";
-  const canEditPairs = status === "PAIRS_DONE";
-  const canGenerateGroups =
+  const pairCount = tournament.pairs.length;
+  const inPairsStage = status === "SETUP" || status === "PAIRS_DONE";
+
+  const showPairing = pairCount > 0 || (status === "SETUP" && playerCount >= 4);
+  const showZoneDraft =
     tournament.format === "GROUPS_KO" &&
     status === "PAIRS_DONE" &&
-    Boolean(tournament.groupsCount);
+    Boolean(tournament.groupsCount) &&
+    pairCount >= (tournament.groupsCount ?? 0) * 2;
+  const groupStageDone =
+    tournament.groups.length > 0 &&
+    tournament.groups.every((g) => g.matches.every((m) => m.winner));
   const canGenerateBracket =
     (tournament.format === "SINGLE_ELIMINATION" &&
       status === "PAIRS_DONE" &&
-      tournament.pairs.length >= 2) ||
+      pairCount >= 2) ||
     (tournament.format === "GROUPS_KO" &&
       status === "GROUP_STAGE" &&
-      tournament.groups.every((g) => g.matches.every((m) => m.winner)));
+      groupStageDone);
+  const summary = qualifierSummary(tournament);
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-10">
@@ -300,7 +274,7 @@ export default function AdminTournamentPanel({
                   `¿Seguro que querés borrar el torneo "${tournament.name}"? Esta acción no se puede deshacer.`
                 )
               ) {
-                withBusy(deleteTournament);
+                deleteTournament();
               }
             }}
             disabled={busy}
@@ -321,74 +295,72 @@ export default function AdminTournamentPanel({
       <RegistrationSection
         tournament={tournament}
         busy={busy}
-        onSave={(payload) => withBusy(() => saveRegistration(payload))}
+        onSave={saveRegistration}
       />
 
-      {/* Etapa 1: jugadores, sorteo y finanzas */}
+      {/* Etapa 1: jugadores, parejas y finanzas */}
       <PlayersSection
         tournament={tournament}
-        canDraw={canDraw}
         busy={busy}
-        onAdd={(payload) => withBusy(() => addPlayers(payload))}
-        onRemove={(id) => withBusy(() => removePlayer(id))}
-        onDraw={() => withBusy(drawPairs)}
+        onAdd={addPlayers}
+        onRemove={removePlayer}
         onReopen={() => {
           if (
             confirm(
               "Volver a editar jugadores borra las parejas, las zonas y el cuadro. ¿Continuar?"
             )
           )
-            withBusy(() => resetTo("SETUP"));
+            send("/reset", { to: "SETUP" });
         }}
       />
 
       <FinanceSection
         tournament={tournament}
         busy={busy}
-        onSave={(fee, cost) => withBusy(() => saveFinance(fee, cost))}
+        onSave={(registrationFee, courtCost) =>
+          send(
+            "/finance",
+            { registrationFee, courtCost },
+            "Error al guardar los montos"
+          )
+        }
       />
 
-      {canEditFormat && (
+      {showPairing && (
+        <PairingSection
+          // Al cambiar las parejas guardadas el borrador tiene que arrancar de
+          // nuevo desde la base: remontar es más simple que sincronizar.
+          key={tournament.pairs.map((p) => p.id).join("-")}
+          tournament={tournament}
+          editable={inPairsStage}
+          busy={busy}
+          onSave={savePairs}
+        />
+      )}
+
+      {inPairsStage && (
         <FormatSection
           tournament={tournament}
+          warnings={formatWarnings}
           busy={busy}
-          onSave={(format, groupsCount, qualifiersPerGroup) =>
-            withBusy(() => saveFormat(format, groupsCount, qualifiersPerGroup))
+          onSave={saveFormat}
+        />
+      )}
+
+      {showZoneDraft && (
+        <ZoneDraftSection
+          // Si cambia la cantidad de zonas hay que repartir de nuevo.
+          key={`${tournament.groupsCount}-${pairCount}`}
+          tournament={tournament}
+          busy={busy}
+          onGenerate={(groups) =>
+            send(
+              "/generate-groups",
+              { groups: groups.map((pairIds) => ({ pairIds })) },
+              "Error al armar las zonas"
+            )
           }
         />
-      )}
-
-      {tournament.pairs.length > 0 && (
-        <PairsSection
-          tournament={tournament}
-          editable={canEditPairs}
-          busy={busy}
-          onSave={(pairs) => withBusy(() => savePairs(pairs))}
-          onRedraw={() => {
-            if (confirm("¿Volver a sortear las parejas al azar?"))
-              withBusy(drawPairs);
-          }}
-        />
-      )}
-
-      {canGenerateGroups && (
-        <section className="card-border rounded-lg bg-surface-container p-5">
-          <h2 className="mb-3 text-lg font-semibold text-on-surface">
-            Fase de grupos
-          </h2>
-          <p className="mb-3 text-sm text-on-surface-variant">
-            Se reparten al azar {tournament.pairs.length} parejas en{" "}
-            {tournament.groupsCount} zonas y se arma el fixture de todos
-            contra todos de cada zona.
-          </p>
-          <button
-            onClick={() => withBusy(generateGroups)}
-            disabled={busy}
-            className="rounded-md bg-primary-fixed px-4 py-2 font-medium text-on-primary-fixed hover:bg-primary-fixed-dim disabled:opacity-50"
-          >
-            Armar zonas
-          </button>
-        </section>
       )}
 
       {tournament.groups.length > 0 && (
@@ -398,7 +370,7 @@ export default function AdminTournamentPanel({
           </h2>
           <p className="mb-4 text-sm text-on-surface-variant">
             {status === "GROUP_STAGE"
-              ? "Tocá la pareja ganadora de cada partido. Si te equivocás, tocá la otra para cambiarlo."
+              ? "Tocá la pareja ganadora de cada partido. Si te equivocás, tocá la otra para cambiarlo. Con las flechas ordenás a mano los empates que la cancha no resolvió."
               : "La fase de grupos está cerrada (el cuadro final ya fue armado)."}
           </p>
           <GroupsView
@@ -406,6 +378,13 @@ export default function AdminTournamentPanel({
             qualifiersPerGroup={tournament.qualifiersPerGroup ?? 1}
             editable={status === "GROUP_STAGE"}
             onPickWinner={pickWinner}
+            onSaveGroup={(groupId: string, settings: GroupSettings) =>
+              send(
+                `/groups/${groupId}`,
+                settings,
+                "No se pudo guardar el cambio en la zona"
+              )
+            }
             busyMatchId={busyMatchId}
           />
           <div className="mt-4 border-t border-surface-bright pt-3">
@@ -416,7 +395,7 @@ export default function AdminTournamentPanel({
                     "Esto borra las zonas y el cuadro para volver a la etapa de parejas y formato. ¿Continuar?"
                   )
                 )
-                  withBusy(() => resetTo("PAIRS_DONE"));
+                  send("/reset", { to: "PAIRS_DONE" });
               }}
               disabled={busy}
               className="text-sm font-medium text-on-surface-variant hover:text-primary-fixed hover:underline disabled:opacity-50"
@@ -435,11 +414,15 @@ export default function AdminTournamentPanel({
           </h2>
           <p className="mb-3 text-sm text-on-surface-variant">
             {tournament.format === "GROUPS_KO"
-              ? `Se arma el cruce con los ${tournament.qualifiersPerGroup} clasificados de cada zona.`
-              : `Se sortea el cruce de ${tournament.pairs.length} parejas al azar.`}
+              ? `Clasifican ${summary.count} parejas: cuadro de ${summary.bracketSize}${
+                  summary.byes > 0
+                    ? `, con ${summary.byes} pase(s) libre(s) para las mejores`
+                    : ""
+                }. Las parejas de la misma zona no se cruzan en la primera ronda.`
+              : `Se sortea el cruce de ${pairCount} parejas al azar.`}
           </p>
           <button
-            onClick={() => withBusy(generateBracket)}
+            onClick={() => send("/generate-bracket", undefined, "Error al armar el cuadro")}
             disabled={busy}
             className="rounded-md bg-primary-fixed px-4 py-2 font-medium text-on-primary-fixed hover:bg-primary-fixed-dim disabled:opacity-50"
           >
@@ -452,11 +435,10 @@ export default function AdminTournamentPanel({
 
       {tournament.matches.length > 0 && (
         <section className="card-border rounded-lg bg-surface-container p-5">
-          <h2 className="mb-1 text-lg font-semibold text-on-surface">
-            Cuadro
-          </h2>
+          <h2 className="mb-1 text-lg font-semibold text-on-surface">Cuadro</h2>
           <p className="mb-4 text-sm text-on-surface-variant">
-            Tocá la pareja ganadora de cada partido para que avance de ronda.
+            Tocá la pareja ganadora de cada partido para que avance de ronda. Las
+            que pasaron libres ya están puestas en la ronda siguiente.
           </p>
           <BracketView
             matches={tournament.matches}
@@ -474,7 +456,7 @@ export default function AdminTournamentPanel({
                       : "Esto borra el cuadro para volver a la etapa de parejas. ¿Continuar?"
                   )
                 )
-                  withBusy(() => resetTo(toGroups ? "GROUP_STAGE" : "PAIRS_DONE"));
+                  send("/reset", { to: toGroups ? "GROUP_STAGE" : "PAIRS_DONE" });
               }}
               disabled={busy}
               className="text-sm font-medium text-on-surface-variant hover:text-primary-fixed hover:underline disabled:opacity-50"
@@ -489,7 +471,7 @@ export default function AdminTournamentPanel({
                       "Esto borra el cuadro y las zonas para volver a la etapa de parejas y formato. ¿Continuar?"
                     )
                   )
-                    withBusy(() => resetTo("PAIRS_DONE"));
+                    send("/reset", { to: "PAIRS_DONE" });
                 }}
                 disabled={busy}
                 className="text-sm font-medium text-on-surface-variant hover:text-primary-fixed hover:underline disabled:opacity-50"
@@ -503,655 +485,3 @@ export default function AdminTournamentPanel({
     </div>
   );
 }
-
-function PlayersSection({
-  tournament,
-  canDraw,
-  busy,
-  onAdd,
-  onRemove,
-  onDraw,
-  onReopen,
-}: {
-  tournament: TournamentDetail;
-  canDraw: boolean;
-  busy: boolean;
-  onAdd: (payload: {
-    names?: string[];
-    playerIds?: string[];
-  }) => Promise<boolean>;
-  onRemove: (id: string) => void;
-  onDraw: () => void;
-  onReopen: () => void;
-}) {
-  const [bulkNames, setBulkNames] = useState("");
-  const [roster, setRoster] = useState<PlayerWithStats[]>([]);
-  const [search, setSearch] = useState("");
-  const [showNewForm, setShowNewForm] = useState(false);
-  const editable = tournament.status === "SETUP";
-
-  const loadRoster = useCallback(async () => {
-    const res = await fetch("/api/players", { cache: "no-store" });
-    if (res.ok) setRoster(await res.json());
-  }, []);
-
-  useEffect(() => {
-    if (!editable) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- carga inicial del listado
-    loadRoster();
-  }, [editable, loadRoster]);
-
-  const enrolledIds = new Set(tournament.players.map((p) => p.id));
-  const available = roster
-    .filter((p) => !enrolledIds.has(p.id))
-    .filter((p) => p.name.toLowerCase().includes(search.trim().toLowerCase()));
-
-  async function handleAddFromRoster(playerId: string) {
-    const ok = await onAdd({ playerIds: [playerId] });
-    if (ok) await loadRoster();
-  }
-
-  async function handleAddNew(e: React.FormEvent) {
-    e.preventDefault();
-    const names = bulkNames
-      .split("\n")
-      .map((n) => n.trim())
-      .filter(Boolean);
-    if (names.length === 0) return;
-    // Sólo limpiamos el campo si se agregaron bien (si no, no perdés lo escrito).
-    const ok = await onAdd({ names });
-    if (ok) {
-      setBulkNames("");
-      setShowNewForm(false);
-      await loadRoster();
-    }
-  }
-
-  return (
-    <section className="card-border rounded-lg bg-surface-container p-5">
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <h2 className="text-lg font-semibold text-on-surface">
-          Jugadores anotados ({tournament.players.length})
-        </h2>
-        {!editable && (
-          <button
-            onClick={onReopen}
-            disabled={busy}
-            className="text-sm font-medium text-on-surface-variant hover:text-primary-fixed hover:underline disabled:opacity-50"
-          >
-            ↩ Volver a editar jugadores
-          </button>
-        )}
-      </div>
-
-      <ul className="mb-4 flex flex-wrap gap-2">
-        {tournament.players.map((p) => (
-          <li
-            key={p.id}
-            className="flex items-center gap-2 rounded-full bg-surface-container-high px-3 py-1 text-sm text-on-surface"
-          >
-            {p.name}
-            {editable && (
-              <button
-                onClick={() => onRemove(p.id)}
-                disabled={busy}
-                aria-label={`Quitar a ${p.name}`}
-                className="text-on-surface-variant hover:text-error"
-              >
-                ×
-              </button>
-            )}
-          </li>
-        ))}
-        {tournament.players.length === 0 && (
-          <li className="text-sm text-on-surface-variant">
-            Sin jugadores todavía.
-          </li>
-        )}
-      </ul>
-
-      {editable && (
-        <div className="mb-4 rounded-md border border-surface-bright bg-surface-dim p-3">
-          <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <h3 className="text-sm font-semibold text-on-surface">
-              Anotar del listado del club
-            </h3>
-            <input
-              className="rounded-md border border-surface-bright bg-surface-container px-3 py-1.5 text-sm text-on-surface outline-none focus:border-primary-fixed"
-              placeholder="Buscar jugador..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-
-          {available.length === 0 ? (
-            <p className="py-2 text-sm text-on-surface-variant">
-              {roster.length === enrolledIds.size
-                ? "Ya están anotados todos los jugadores del club."
-                : "Ningún jugador coincide con la búsqueda."}
-            </p>
-          ) : (
-            <ul className="flex max-h-52 flex-wrap gap-2 overflow-y-auto">
-              {available.map((p) => (
-                <li key={p.id}>
-                  <button
-                    onClick={() => handleAddFromRoster(p.id)}
-                    disabled={busy}
-                    className="flex items-center gap-1 rounded-full border border-surface-bright px-3 py-1 text-sm text-on-surface transition-colors hover:border-primary-fixed hover:text-primary-fixed disabled:opacity-50"
-                  >
-                    <span className="text-primary-fixed">+</span>
-                    {p.name}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          <div className="mt-3 border-t border-surface-bright pt-3">
-            {showNewForm ? (
-              <form onSubmit={handleAddNew} className="flex flex-col gap-2">
-                <textarea
-                  className="rounded-md border border-surface-bright bg-surface-container px-3 py-2 text-on-surface outline-none focus:border-primary-fixed"
-                  rows={3}
-                  placeholder={
-                    "Un nombre por línea, ej:\nJuan Pérez\nAna Gómez"
-                  }
-                  value={bulkNames}
-                  onChange={(e) => setBulkNames(e.target.value)}
-                />
-                <p className="text-xs text-on-surface-variant">
-                  Se guardan en el listado del club y quedan disponibles para
-                  los próximos torneos. Si el nombre ya existe, se reutiliza.
-                </p>
-                <div className="flex gap-2">
-                  <button
-                    type="submit"
-                    disabled={busy}
-                    className="rounded-md bg-primary-fixed px-4 py-2 text-sm font-medium text-on-primary-fixed hover:bg-primary-fixed-dim disabled:opacity-50"
-                  >
-                    Agregar y anotar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowNewForm(false)}
-                    className="rounded-md border border-surface-bright px-4 py-2 text-sm font-medium text-on-surface hover:bg-surface-container-high"
-                  >
-                    Cancelar
-                  </button>
-                </div>
-              </form>
-            ) : (
-              <button
-                onClick={() => setShowNewForm(true)}
-                className="text-sm font-medium text-primary-fixed hover:underline"
-              >
-                + Jugador nuevo (no está en el listado)
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
-      {editable && (
-        <button
-          onClick={onDraw}
-          disabled={!canDraw || busy}
-          className="rounded-md bg-primary-fixed px-4 py-2 font-medium text-on-primary-fixed hover:bg-primary-fixed-dim disabled:opacity-50"
-        >
-          Sortear parejas
-        </button>
-      )}
-      {editable && !canDraw && (
-        <p className="mt-2 text-sm text-on-surface-variant">
-          Necesitás una cantidad par de jugadores (mínimo 4) para sortear.
-        </p>
-      )}
-    </section>
-  );
-}
-
-/**
- * Convierte el ISO que guarda la base al formato que espera un input
- * `datetime-local`, en la hora local del navegador. Como el organizador está
- * en Argentina, su hora local ES la hora del torneo.
- */
-function toLocalInputValue(iso: string | null): string {
-  if (!iso) return "";
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "";
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-    date.getDate()
-  )}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
-
-/**
- * Anuncio del torneo: fecha de inicio y apertura de inscripciones.
- *
- * Mientras las inscripciones estén abiertas aparece la barra de anuncio en toda
- * la web y cualquiera puede anotarse solo con su DNI. Cerrarlas no cambia el
- * estado del torneo: el sorteo se hace igual que siempre, cuando el organizador
- * quiera.
- */
-function RegistrationSection({
-  tournament,
-  busy,
-  onSave,
-}: {
-  tournament: TournamentDetail;
-  busy: boolean;
-  onSave: (payload: {
-    startsAt?: string | null;
-    registrationOpen?: boolean;
-  }) => void;
-}) {
-  const [startsAt, setStartsAt] = useState(
-    toLocalInputValue(tournament.startsAt)
-  );
-
-  const isSetup = tournament.status === "SETUP";
-  const open = tournament.registrationOpen;
-
-  function handleSaveDate(e: React.FormEvent) {
-    e.preventDefault();
-    // El input da hora local; se manda el instante absoluto para que el
-    // servidor (que corre en UTC) guarde el momento correcto.
-    onSave({ startsAt: startsAt ? new Date(startsAt).toISOString() : null });
-  }
-
-  return (
-    <section className="card-border rounded-lg bg-surface-container p-5">
-      <h2 className="mb-3 text-lg font-semibold text-on-surface">
-        Anuncio e inscripciones
-      </h2>
-
-      <form
-        onSubmit={handleSaveDate}
-        className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto]"
-      >
-        <label className="block">
-          <span className="mb-1 block text-sm font-medium text-on-surface">
-            Fecha y hora de inicio
-          </span>
-          <input
-            type="datetime-local"
-            className="w-full rounded-md border border-surface-bright bg-surface-dim px-3 py-2 text-on-surface outline-none focus:border-primary-fixed"
-            value={startsAt}
-            onChange={(e) => setStartsAt(e.target.value)}
-          />
-        </label>
-        <button
-          type="submit"
-          disabled={busy}
-          className="self-end rounded-md bg-primary-fixed px-4 py-2 text-sm font-medium text-on-primary-fixed hover:bg-primary-fixed-dim disabled:opacity-50"
-        >
-          Guardar fecha
-        </button>
-      </form>
-
-      <div className="flex flex-col gap-3 border-t border-surface-bright pt-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-sm font-medium text-on-surface">
-            {open ? "Inscripciones abiertas" : "Inscripciones cerradas"}
-          </p>
-          <p className="text-sm text-on-surface-variant">
-            {open
-              ? `Se está anunciando en toda la web. Hay ${tournament.players.length} jugador(es) anotado(s).`
-              : isSetup
-                ? "Abrilas para que los jugadores se anoten solos con su DNI."
-                : "Ya se sortearon las parejas: no se pueden reabrir."}
-          </p>
-        </div>
-        <button
-          onClick={() => {
-            if (
-              open &&
-              !confirm(
-                "Cerrar las inscripciones saca el anuncio de la web y nadie más va a poder anotarse solo. ¿Continuar?"
-              )
-            ) {
-              return;
-            }
-            onSave({ registrationOpen: !open });
-          }}
-          disabled={busy || (!open && !isSetup)}
-          className={`shrink-0 rounded-md px-4 py-2 text-sm font-medium disabled:opacity-50 ${
-            open
-              ? "border border-surface-bright text-on-surface hover:bg-surface-container-high"
-              : "bg-primary-fixed text-on-primary-fixed hover:bg-primary-fixed-dim"
-          }`}
-        >
-          {open ? "Cerrar inscripciones" : "Abrir inscripciones"}
-        </button>
-      </div>
-    </section>
-  );
-}
-
-function FinanceSection({
-  tournament,
-  busy,
-  onSave,
-}: {
-  tournament: TournamentDetail;
-  busy: boolean;
-  onSave: (fee: number, cost: number) => void;
-}) {
-  const [fee, setFee] = useState(tournament.registrationFee ?? "");
-  const [cost, setCost] = useState(tournament.courtCost ?? "");
-
-  const feeNum = Number(fee) || 0;
-  const costNum = Number(cost) || 0;
-  const prize = feeNum * tournament.players.length - costNum;
-
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    onSave(feeNum, costNum);
-  }
-
-  return (
-    <section className="card-border rounded-lg bg-surface-container p-5">
-      <h2 className="mb-3 text-lg font-semibold text-on-surface">
-        Inscripción y premio
-      </h2>
-      <form
-        onSubmit={handleSubmit}
-        className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2"
-      >
-        <label className="block">
-          <span className="mb-1 block text-sm font-medium text-on-surface">
-            Inscripción por jugador ($)
-          </span>
-          <input
-            type="number"
-            min={0}
-            step="0.01"
-            className="w-full rounded-md border border-surface-bright bg-surface-dim px-3 py-2 text-on-surface outline-none focus:border-primary-fixed"
-            value={fee}
-            onChange={(e) => setFee(e.target.value)}
-          />
-        </label>
-        <label className="block">
-          <span className="mb-1 block text-sm font-medium text-on-surface">
-            Costo total de canchas ($)
-          </span>
-          <input
-            type="number"
-            min={0}
-            step="0.01"
-            className="w-full rounded-md border border-surface-bright bg-surface-dim px-3 py-2 text-on-surface outline-none focus:border-primary-fixed"
-            value={cost}
-            onChange={(e) => setCost(e.target.value)}
-          />
-        </label>
-        <button
-          type="submit"
-          disabled={busy}
-          className="self-end rounded-md bg-primary-fixed px-4 py-2 text-sm font-medium text-on-primary-fixed hover:bg-primary-fixed-dim disabled:opacity-50 sm:col-span-2 sm:w-fit"
-        >
-          Guardar montos
-        </button>
-      </form>
-      <p className="text-sm text-on-surface-variant">
-        Recaudado:{" "}
-        <strong className="text-on-surface">
-          ${(feeNum * tournament.players.length).toFixed(2)}
-        </strong>{" "}
-        ({tournament.players.length} jugadores) — Canchas:{" "}
-        <strong className="text-on-surface">${costNum.toFixed(2)}</strong>
-      </p>
-      <p className="mt-1 text-lg font-semibold text-primary-fixed">
-        Premio: ${prize.toFixed(2)}
-      </p>
-    </section>
-  );
-}
-
-function FormatSection({
-  tournament,
-  busy,
-  onSave,
-}: {
-  tournament: TournamentDetail;
-  busy: boolean;
-  onSave: (
-    format: TournamentFormat,
-    groupsCount?: number,
-    qualifiersPerGroup?: number
-  ) => void;
-}) {
-  const [format, setFormat] = useState<TournamentFormat>(tournament.format);
-  const [groupsCount, setGroupsCount] = useState(
-    String(tournament.groupsCount ?? 2)
-  );
-  const [qualifiersPerGroup, setQualifiersPerGroup] = useState(
-    String(tournament.qualifiersPerGroup ?? 2)
-  );
-
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (format === "GROUPS_KO") {
-      onSave(format, Number(groupsCount), Number(qualifiersPerGroup));
-    } else {
-      onSave(format);
-    }
-  }
-
-  return (
-    <section className="card-border rounded-lg bg-surface-container p-5">
-      <h2 className="mb-3 text-lg font-semibold text-on-surface">
-        Formato del torneo
-      </h2>
-      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-        <div className="flex flex-col gap-2 sm:flex-row">
-          {(["SINGLE_ELIMINATION", "GROUPS_KO"] as const).map((f) => (
-            <label
-              key={f}
-              className={`flex-1 cursor-pointer rounded-md border px-3 py-2 text-sm ${
-                format === f
-                  ? "border-primary-fixed bg-primary-fixed/10 text-primary-fixed"
-                  : "border-surface-bright text-on-surface-variant"
-              }`}
-            >
-              <input
-                type="radio"
-                name="format"
-                value={f}
-                checked={format === f}
-                onChange={() => setFormat(f)}
-                className="mr-2"
-              />
-              {formatLabels[f]}
-            </label>
-          ))}
-        </div>
-
-        {format === "GROUPS_KO" && (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <label className="block">
-              <span className="mb-1 block text-sm font-medium text-on-surface">
-                Cantidad de zonas
-              </span>
-              <input
-                type="number"
-                min={1}
-                className="w-full rounded-md border border-surface-bright bg-surface-dim px-3 py-2 text-on-surface outline-none focus:border-primary-fixed"
-                value={groupsCount}
-                onChange={(e) => setGroupsCount(e.target.value)}
-              />
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-sm font-medium text-on-surface">
-                Clasifican por zona
-              </span>
-              <input
-                type="number"
-                min={1}
-                className="w-full rounded-md border border-surface-bright bg-surface-dim px-3 py-2 text-on-surface outline-none focus:border-primary-fixed"
-                value={qualifiersPerGroup}
-                onChange={(e) => setQualifiersPerGroup(e.target.value)}
-              />
-            </label>
-          </div>
-        )}
-
-        <button
-          type="submit"
-          disabled={busy}
-          className="self-start rounded-md bg-primary-fixed px-4 py-2 text-sm font-medium text-on-primary-fixed hover:bg-primary-fixed-dim disabled:opacity-50"
-        >
-          Guardar formato
-        </button>
-      </form>
-    </section>
-  );
-}
-
-function PairsSection({
-  tournament,
-  editable,
-  busy,
-  onSave,
-  onRedraw,
-}: {
-  tournament: TournamentDetail;
-  editable: boolean;
-  busy: boolean;
-  onSave: (pairs: { player1Id: string; player2Id: string }[]) => void;
-  onRedraw: () => void;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState<[string, string][]>([]);
-
-  function startEditing() {
-    setDraft(tournament.pairs.map((p) => [p.player1.id, p.player2.id]));
-    setEditing(true);
-  }
-
-  // Cambia un jugador de una pareja. Si el jugador elegido ya estaba en otra
-  // posición, se intercambia con el que ocupaba este lugar, de modo que todos
-  // los jugadores queden siempre repartidos en parejas.
-  function updateSlot(pairIndex: number, slot: 0 | 1, playerId: string) {
-    setDraft((prev) => {
-      const next = prev.map((pair) => [...pair] as [string, string]);
-      const displaced = next[pairIndex][slot];
-      if (displaced === playerId) return prev;
-
-      outer: for (let i = 0; i < next.length; i++) {
-        for (let s = 0 as 0 | 1; s <= 1; s = (s + 1) as 0 | 1) {
-          if (next[i][s] === playerId) {
-            next[i][s] = displaced;
-            break outer;
-          }
-        }
-      }
-      next[pairIndex][slot] = playerId;
-      return next;
-    });
-  }
-
-  function handleSave() {
-    onSave(
-      draft.map(([player1Id, player2Id]) => ({ player1Id, player2Id }))
-    );
-    setEditing(false);
-  }
-
-  return (
-    <section className="card-border rounded-lg bg-surface-container p-5">
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <h2 className="text-lg font-semibold text-on-surface">
-          Parejas sorteadas
-        </h2>
-        {editable && !editing && (
-          <div className="flex items-center gap-3">
-            <button
-              onClick={onRedraw}
-              disabled={busy}
-              className="text-sm font-medium text-on-surface-variant hover:text-primary-fixed hover:underline disabled:opacity-50"
-            >
-              🎲 Re-sortear
-            </button>
-            <button
-              onClick={startEditing}
-              className="text-sm font-medium text-primary-fixed hover:underline"
-            >
-              Editar parejas
-            </button>
-          </div>
-        )}
-      </div>
-
-      {editing ? (
-        <div className="flex flex-col gap-3">
-          <p className="text-sm text-on-surface-variant">
-            Elegí un jugador en cualquier posición: si ya estaba en otra
-            pareja, se intercambian automáticamente.
-          </p>
-          {draft.map(([player1Id, player2Id], i) => {
-            return (
-              <div
-                key={i}
-                className="grid grid-cols-1 items-center gap-2 rounded-md bg-surface-container-high p-2 sm:grid-cols-[1fr_auto_1fr]"
-              >
-                <select
-                  className="rounded-md border border-surface-bright bg-surface-dim px-2 py-1.5 text-sm text-on-surface outline-none focus:border-primary-fixed"
-                  value={player1Id}
-                  onChange={(e) => updateSlot(i, 0, e.target.value)}
-                >
-                  {tournament.players.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
-                <span className="text-center text-sm text-on-surface-variant">
-                  &amp;
-                </span>
-                <select
-                  className="rounded-md border border-surface-bright bg-surface-dim px-2 py-1.5 text-sm text-on-surface outline-none focus:border-primary-fixed"
-                  value={player2Id}
-                  onChange={(e) => updateSlot(i, 1, e.target.value)}
-                >
-                  {tournament.players.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            );
-          })}
-          <div className="flex gap-2">
-            <button
-              onClick={handleSave}
-              disabled={busy}
-              className="rounded-md bg-primary-fixed px-4 py-2 text-sm font-medium text-on-primary-fixed hover:bg-primary-fixed-dim disabled:opacity-50"
-            >
-              Guardar parejas
-            </button>
-            <button
-              onClick={() => setEditing(false)}
-              disabled={busy}
-              className="rounded-md border border-surface-bright px-4 py-2 text-sm font-medium text-on-surface hover:bg-surface-container-high"
-            >
-              Cancelar
-            </button>
-          </div>
-        </div>
-      ) : (
-        <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {tournament.pairs.map((pair, i) => (
-            <li
-              key={pair.id}
-              className="rounded-md bg-surface-container-high px-3 py-2 text-sm text-on-surface"
-            >
-              {i + 1}. {pairLabel(pair)}
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
-  );
-}
-

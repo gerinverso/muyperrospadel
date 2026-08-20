@@ -1,9 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ensureAdmin, unauthorized } from "@/lib/api-utils";
+import { groupSizes } from "@/lib/groups";
 
 const FORMATS = ["SINGLE_ELIMINATION", "GROUPS_KO"] as const;
 
+/**
+ * Guarda el formato del torneo y, si es fase de grupos, cuántas zonas hay y
+ * cuántos clasifican por zona.
+ *
+ * Sólo rechaza lo que no se puede jugar (menos de 2 parejas por zona, o más
+ * clasificados que parejas en la zona más grande). Todo lo demás se permite y
+ * se devuelve como aviso: que en una zona chica clasifiquen todas es una
+ * decisión válida del organizador, no un error. Antes se bloqueaba y por eso
+ * con pocas parejas no se podían usar más de 2 zonas.
+ */
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -15,7 +26,7 @@ export async function POST(
 
   const tournament = await prisma.tournament.findUnique({
     where: { id },
-    include: { pairs: true },
+    include: { pairs: { select: { id: true } } },
   });
   if (!tournament) {
     return NextResponse.json({ error: "Torneo no encontrado" }, { status: 404 });
@@ -38,7 +49,7 @@ export async function POST(
       where: { id },
       data: { format, groupsCount: null, qualifiersPerGroup: null },
     });
-    return NextResponse.json(updated);
+    return NextResponse.json({ ...updated, warnings: [] });
   }
 
   const groupsCount = Number(body?.groupsCount);
@@ -58,20 +69,55 @@ export async function POST(
   }
 
   const pairCount = tournament.pairs.length;
+  const warnings: string[] = [];
+
   if (pairCount > 0) {
-    if (groupsCount > pairCount) {
+    if (groupsCount * 2 > pairCount) {
       return NextResponse.json(
-        { error: "No puede haber más zonas que parejas" },
+        {
+          error: `Con ${pairCount} parejas no se pueden armar ${groupsCount} zonas: cada zona necesita al menos 2 parejas (máximo ${Math.floor(
+            pairCount / 2
+          )} zonas)`,
+        },
         { status: 400 }
       );
     }
-    const smallestGroupSize = Math.floor(pairCount / groupsCount);
-    if (qualifiersPerGroup >= smallestGroupSize) {
+
+    const sizes = groupSizes(pairCount, groupsCount);
+    const biggest = sizes[0];
+    const smallest = sizes[sizes.length - 1];
+
+    if (qualifiersPerGroup > biggest) {
       return NextResponse.json(
         {
-          error: `Con ${pairCount} parejas en ${groupsCount} zonas, alguna zona queda con ${smallestGroupSize} parejas: no pueden clasificar ${qualifiersPerGroup}`,
+          error: `La zona más grande queda con ${biggest} parejas: no pueden clasificar ${qualifiersPerGroup}`,
         },
         { status: 400 }
+      );
+    }
+
+    // Cada zona clasifica como máximo las parejas que tiene.
+    const qualifierCount = sizes.reduce(
+      (total, size) => total + Math.min(qualifiersPerGroup, size),
+      0
+    );
+
+    if (qualifiersPerGroup >= smallest) {
+      warnings.push(
+        `En las zonas de ${smallest} parejas van a clasificar todas. Podés bajarle los clasificados a esa zona cuando estén armadas.`
+      );
+    }
+    if (qualifierCount >= pairCount) {
+      warnings.push(
+        "Con esta configuración clasifican todas las parejas: la fase de grupos no elimina a nadie."
+      );
+    }
+    const bracketSize = 2 ** Math.ceil(Math.log2(Math.max(qualifierCount, 2)));
+    if (bracketSize > qualifierCount) {
+      warnings.push(
+        `Clasifican ${qualifierCount} parejas: el cuadro es de ${bracketSize}, así que ${
+          bracketSize - qualifierCount
+        } van a pasar libres la primera ronda.`
       );
     }
   }
@@ -81,5 +127,5 @@ export async function POST(
     data: { format, groupsCount, qualifiersPerGroup },
   });
 
-  return NextResponse.json(updated);
+  return NextResponse.json({ ...updated, warnings });
 }

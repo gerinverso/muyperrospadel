@@ -26,11 +26,19 @@ enum TournamentFormat {
   GROUPS_KO // fase de grupos (zonas) y luego eliminacion directa con los clasificados
 }
 
+enum PairingMode {
+  DRAW // las parejas se sortearon al azar
+  MANUAL // el organizador las formo a mano
+}
+
 model Tournament {
   id                 String           @id @default(cuid())
   name               String
   status             TournamentStatus @default(SETUP)
   format             TournamentFormat @default(SINGLE_ELIMINATION)
+  /// Como se armaron las parejas. No cambia la logica: solo decide si la
+  /// pagina dice "sorteadas" o "definidas por el organizador".
+  pairingMode        PairingMode      @default(DRAW)
   groupsCount        Int? // cantidad de zonas, solo si format = GROUPS_KO
   qualifiersPerGroup Int? // cuantas parejas clasifican por zona
   registrationFee    Decimal?         @db.Decimal(10, 2) // lo que pone cada jugador
@@ -38,10 +46,10 @@ model Tournament {
 
   /// Fecha en la que arranca el torneo. Es opcional: si esta cargada, el
   /// anuncio de la home muestra la cuenta regresiva.
-  startsAt DateTime?
+  startsAt         DateTime?
   /// Mientras este en true (y el torneo en SETUP) cualquiera puede anotarse
   /// solo desde la web. El administrador la abre y la cierra a mano.
-  registrationOpen Boolean @default(false)
+  registrationOpen Boolean   @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -58,7 +66,7 @@ model Player {
   id String @id @default(cuid())
 
   /// Nombre para mostrar, tal cual lo escribio quien lo cargo.
-  name String
+  name    String
   /// Nombre normalizado (minusculas, sin acentos, sin espacios de mas). NO es
   /// unico: dos personas distintas pueden llamarse igual y se diferencian por
   /// el DNI. Sirve para detectar posibles duplicados, no para identificar.
@@ -66,7 +74,7 @@ model Player {
   /// Identidad real de la persona. Sigue siendo opcional porque los jugadores
   /// cargados antes de la auto-inscripcion no lo tienen: se completa cuando el
   /// jugador se anota solo y el administrador fusiona los duplicados.
-  dni String? @unique
+  dni     String? @unique
 
   tournaments Tournament[] @relation("TournamentPlayers")
 
@@ -80,12 +88,21 @@ model Player {
 }
 
 model Group {
-  id           String @id @default(cuid())
+  id           String     @id @default(cuid())
   tournamentId String
   tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
 
   name  String // "Zona A", "Zona B", ...
   index Int // 0-based, para ordenar y armar el nombre
+
+  /// Clasificados propios de esta zona. null usa el numero general del torneo.
+  /// Sirve cuando las zonas quedan de distinto tamano y de una tiene que pasar
+  /// una cantidad distinta.
+  qualifiers    Int?
+  /// Orden manual de las parejas que el organizador definio para desempatar.
+  /// Solo se aplica entre parejas que quedaron empatadas en partidos ganados y
+  /// en la mini-liga entre ellas: nunca puede pasar por encima de un resultado.
+  tiebreakOrder String[] @default([])
 
   pairs   Pair[]
   matches Match[]
@@ -96,7 +113,7 @@ model Group {
 }
 
 model Pair {
-  id           String @id @default(cuid())
+  id           String     @id @default(cuid())
   tournamentId String
   tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
 
@@ -121,7 +138,7 @@ model Pair {
 }
 
 model Match {
-  id           String @id @default(cuid())
+  id           String     @id @default(cuid())
   tournamentId String
   tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
 
