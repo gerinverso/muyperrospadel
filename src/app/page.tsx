@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { prisma } from "@/lib/prisma";
 import { statusLabels, type TournamentStatus } from "@/lib/types";
+import TournamentHero from "@/components/TournamentHero";
 
 export const dynamic = "force-dynamic";
 
@@ -72,6 +73,8 @@ export default async function Home({
 
   return (
     <main className="mx-auto w-full max-w-[1440px] flex-grow px-margin-mobile py-space-lg md:px-margin-desktop">
+      <TournamentHero />
+
       <header className="mb-space-lg flex flex-col items-start justify-between gap-space-md md:flex-row md:items-end">
         <div>
           <h1 className="font-headline-lg-mobile text-headline-lg-mobile uppercase tracking-tight text-primary-fixed md:font-headline-lg md:text-headline-lg">

@@ -56,7 +56,7 @@ export default async function RegistrationPage({
         </h1>
         <p className="font-body-lg text-body-lg mt-2 text-on-surface-variant">
           {tournament.startsAt && (
-            <span className="capitalize">
+            <span className="first-letter:uppercase">
               {formatStartDate(tournament.startsAt)}
             </span>
           )}

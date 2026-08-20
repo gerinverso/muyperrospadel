@@ -56,7 +56,10 @@ export async function POST(
     ),
     prisma.tournament.update({
       where: { id },
-      data: { status: "PAIRS_DONE" },
+      // El sorteo cierra las inscripciones: ya nadie puede sumarse al cuadro,
+      // asi que dejar el flag prendido solo haria que el panel diga que estan
+      // abiertas cuando no lo estan.
+      data: { status: "PAIRS_DONE", registrationOpen: false },
     }),
   ]);
 
