@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ensureAdmin, unauthorized } from "@/lib/api-utils";
-import { forwardPath, isByeSlot } from "@/lib/bracket";
+import { forwardPath } from "@/lib/bracket";
 import { loadTournamentDetail } from "@/lib/tournament-query";
 
 export async function POST(
@@ -67,9 +67,9 @@ export async function POST(
  * Guarda el ganador de un cruce del cuadro y lo lleva a la ronda siguiente.
  *
  * Si se cambia el ganador de un partido ya jugado, limpia en cascada los
- * resultados posteriores que dependían del anterior. Los cruces que son un pase
- * libre (no pueden tener rival) se resuelven al toque con la pareja que llega,
- * así el ganador sigue avanzando sin que nadie tenga que tocar nada.
+ * resultados posteriores que dependían del anterior. Los pases libres no entran
+ * acá: son cajas de la primera ronda y ya vienen resueltas desde que se armó el
+ * cuadro.
  */
 async function propagate(
   tournamentId: string,
@@ -78,16 +78,13 @@ async function propagate(
   matchId: string,
   winnerId: string
 ) {
-  // La cantidad de cruces por ronda define qué cruces son pase libre: se lee
-  // del cuadro guardado, que es la fuente de verdad.
-  const rounds = await prisma.match.groupBy({
-    by: ["round"],
+  // Hasta dónde llega la cadena: la final es la última ronda del cuadro
+  // guardado, que es la fuente de verdad.
+  const last = await prisma.match.aggregate({
     where: { tournamentId, groupId: null },
-    _count: { _all: true },
+    _max: { round: true },
   });
-  const roundCounts: number[] = [];
-  for (const row of rounds) roundCounts[row.round - 1] = row._count._all;
-  const totalRounds = roundCounts.length;
+  const totalRounds = last._max.round ?? 0;
 
   await prisma.$transaction(async (tx) => {
     await tx.match.update({ where: { id: matchId }, data: { winnerId } });
@@ -107,21 +104,14 @@ async function propagate(
       };
       const nextMatch = await tx.match.findUnique({ where });
       const hadWinner = nextMatch?.winnerId != null;
-      const bye = isByeSlot(step.round, step.slot, roundCounts);
       const slotData =
         step.position === "A" ? { pairAId: incoming } : { pairBId: incoming };
 
       await tx.match.update({
         where,
-        data: bye
-          ? { ...slotData, winnerId: incoming }
-          : hadWinner
-            ? { ...slotData, winnerId: null }
-            : slotData,
+        data: hadWinner ? { ...slotData, winnerId: null } : slotData,
       });
 
-      // Un pase libre no corta la cadena: la misma pareja sigue avanzando.
-      if (bye) continue;
       // Si este cruce no tenía ganador, nada más adelante dependía de él.
       if (!hadWinner) break;
       incoming = null;

@@ -116,7 +116,7 @@ export async function POST(
     const plan = bracketPlan(Math.max(qualifierCount, 2));
     if (plan.byes > 0) {
       warnings.push(
-        `Clasifican ${qualifierCount} parejas: el cuadro son ${plan.totalMatches} partidos y ${plan.byes} pase(s) libre(s), porque hay rondas que quedan con cantidad impar.`
+        `Clasifican ${qualifierCount} parejas: el cuadro son ${plan.totalMatches} partidos y ${plan.byes} pase(s) libre(s) en la primera ronda, para que después queden ${plan.firstRoundMatches + plan.firstRoundDirect} parejas justas.`
       );
     }
   }

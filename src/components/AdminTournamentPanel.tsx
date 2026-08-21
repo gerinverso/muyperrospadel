@@ -424,25 +424,26 @@ export default function AdminTournamentPanel({
             {tournament.format === "GROUPS_KO"
               ? `Clasifican ${summary.count} parejas: ${plan.firstRoundMatches} partido(s) en la primera ronda`
               : `Se sortea el cruce de ${pairCount} parejas: ${plan.firstRoundMatches} partido(s) en la primera ronda`}
-            {plan.firstRoundDirect === 1 &&
+            {plan.firstRoundDirect > 0 &&
               (tournament.format === "GROUPS_KO"
-                ? " y la mejor pasa libre"
-                : " y una pasa libre")}
+                ? ` y ${plan.firstRoundDirect === 1 ? "la mejor pasa" : `las ${plan.firstRoundDirect} mejores pasan`} libre`
+                : ` y ${plan.firstRoundDirect === 1 ? "una pasa" : `${plan.firstRoundDirect} pasan`} libre`)}
             {`. ${plan.totalMatches} partidos en total.`}
             {tournament.format === "GROUPS_KO" &&
               " Las parejas de la misma zona no se cruzan en la primera ronda."}
           </p>
 
-          {plan.byes > 1 && (
+          {plan.byes > 0 && (
             <p className="mb-3 rounded-md bg-surface-dim px-3 py-2 text-sm text-on-surface-variant">
-              ⚠ Con {bracketPairCount} parejas el cuadro tiene {plan.byes} pases
-              libres: cada ronda que queda con cantidad impar deja una pareja sin
-              rival. Es inevitable con esa cantidad.
+              Con {bracketPairCount} parejas hay {plan.byes} pase
+              {plan.byes === 1 ? "" : "s"} libre{plan.byes === 1 ? "" : "s"},
+              todos en la primera ronda. De ahí en adelante el cuadro es exacto:
+              nadie pasa de largo en cuartos, semifinal ni final.
             </p>
           )}
 
           {tournament.format === "SINGLE_ELIMINATION" &&
-            plan.firstRoundDirect === 1 && (
+            plan.firstRoundDirect > 0 && (
               <label className="mb-3 flex flex-wrap items-center gap-2 text-sm text-on-surface-variant">
                 Pasa libre en la primera ronda:
                 <select

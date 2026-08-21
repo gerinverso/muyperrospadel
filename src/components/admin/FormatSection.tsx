@@ -145,7 +145,7 @@ export default function FormatSection({
                     {plan.byes > 0 &&
                       ` (${plan.byes} pase${plan.byes === 1 ? "" : "s"} libre${
                         plan.byes === 1 ? "" : "s"
-                      })`}
+                      } en la primera ronda)`}
                   </>
                 )}
               </p>

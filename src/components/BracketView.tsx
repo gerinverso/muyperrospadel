@@ -2,7 +2,6 @@
 
 import type { Match } from "@/lib/types";
 import { pairLabel } from "@/lib/types";
-import { isByeSlot } from "@/lib/bracket";
 import { roundName } from "@/lib/round-names";
 
 export default function BracketView({
@@ -18,13 +17,6 @@ export default function BracketView({
 
   const totalRounds = Math.max(...matches.map((m) => m.round));
   const rounds = Array.from({ length: totalRounds }, (_, i) => i + 1);
-
-  // Cuántos cruces tiene cada ronda: con eso se sabe qué cruces son un pase
-  // libre (los que no pueden tener rival porque la ronda anterior no tiene un
-  // segundo partido que los alimente).
-  const roundCounts = rounds.map(
-    (round) => matches.filter((m) => m.round === round).length
-  );
 
   const finalMatch = matches.find((m) => m.round === totalRounds);
   const champion = finalMatch?.winner ?? null;
@@ -54,11 +46,10 @@ export default function BracketView({
                 <MatchCard
                   key={m.id}
                   match={m}
-                  bye={
-                    round === 1
-                      ? Boolean(m.pairA) !== Boolean(m.pairB)
-                      : isByeSlot(round, m.slot, roundCounts)
-                  }
+                  // Los pases libres son cajas de la primera ronda con una sola
+                  // pareja. En las rondas siguientes un lado vacío es un cruce
+                  // que todavía espera el resultado del partido que lo alimenta.
+                  bye={round === 1 && Boolean(m.pairA) !== Boolean(m.pairB)}
                   onPickWinner={onPickWinner}
                   busy={busyMatchId === m.id}
                 />
