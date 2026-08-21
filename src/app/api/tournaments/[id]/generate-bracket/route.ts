@@ -8,16 +8,14 @@ import { loadTournamentDetail } from "@/lib/tournament-query";
 /**
  * Arma el cuadro de eliminación.
  *
- * Con fase de grupos toma los clasificados de cada zona (respetando el número
- * propio de cada una) y los siembra: los pases libres caen en los mejores y se
- * evita que dos parejas de la misma zona se cruzen de entrada. Sin fase de
- * grupos se sortea el cruce.
- *
- * Los pases libres vienen ya resueltos y ubicados en la ronda siguiente desde
- * `@/lib/bracket`, así que no hay que propagar nada después de guardar.
+ * En cada ronda se emparejan todas las parejas que se puedan: si son impares,
+ * una pasa libre y el resto juega. Con fase de grupos el pase libre es para la
+ * mejor clasificada y se evita que dos parejas de la misma zona se cruzen de
+ * entrada; sin fase de grupos se sortea todo, y el organizador puede elegir a
+ * quién le toca pasar libre mandando `byePairId`.
  */
 export async function POST(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const admin = await ensureAdmin();
@@ -106,7 +104,13 @@ export async function POST(
         { status: 400 }
       );
     }
-    slots = generateBracket(tournament.pairs.map((p) => p.id));
+    const body = await req.json().catch(() => null);
+    const byePairId =
+      typeof body?.byePairId === "string" ? body.byePairId : null;
+    slots = generateBracket(
+      tournament.pairs.map((p) => p.id),
+      byePairId
+    );
   }
 
   // Un cuadro de 2 parejas no puede venir con la final resuelta, pero el estado

@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  bracketPlan,
   forwardPath,
   generateBracket,
+  isByeSlot,
   nextMatchPosition,
+  roundSizes,
   seedBracket,
   totalRoundsFor,
   type BracketSlot,
@@ -10,46 +13,49 @@ import {
 
 const key = (round: number, slot: number) => `${round}-${slot}`;
 const pairs = (n: number) => Array.from({ length: n }, (_, i) => `p${i + 1}`);
+const present = (match: BracketSlot) =>
+  [match.pairAId, match.pairBId].filter((id): id is string => Boolean(id));
 
 /**
- * Juega el cuadro completo (gana siempre la pareja de arriba) y devuelve el
- * campeón. Tira error si algún cruce no se puede resolver: es la forma de
- * comprobar que el cuadro nunca queda trabado esperando un rival que no existe.
+ * Juega el cuadro entero (gana siempre la pareja de arriba) y devuelve el
+ * campeón y cuántos partidos se jugaron de verdad.
  *
- * También verifica que lo que el cuadro trajo pre-cargado (los pases libres ya
- * ubicados en la ronda siguiente) coincida con lo que sale de jugarlo.
+ * Emula lo que hace el endpoint de resultados: al llegar una pareja a un cruce
+ * que no puede tener rival, ese pase libre se resuelve solo. Si un cruce no se
+ * puede resolver, tira error: así se comprueba que el cuadro nunca se traba.
  */
-function playBracket(slots: BracketSlot[]): string {
+function playBracket(slots: BracketSlot[], pairCount: number) {
+  const counts = roundSizes(pairCount);
   const board = new Map(slots.map((s) => [key(s.round, s.slot), { ...s }]));
-  const totalRounds = Math.max(...slots.map((s) => s.round));
-  let champion: string | null = null;
+  let played = 0;
 
-  for (let round = 1; round <= totalRounds; round++) {
+  for (let round = 1; round <= counts.length; round++) {
     const inRound = [...board.values()]
       .filter((s) => s.round === round)
       .sort((a, b) => a.slot - b.slot);
 
     for (const match of inRound) {
-      const present = [match.pairAId, match.pairBId].filter(
-        (id): id is string => Boolean(id)
-      );
+      const here = present(match);
+      const bye =
+        round === 1 ? here.length === 1 : isByeSlot(round, match.slot, counts);
       let winner: string;
-      if (present.length === 2) {
-        // Un cruce que se juega de verdad no puede venir con ganador puesto.
-        expect(match.winnerId).toBeNull();
-        winner = present[0];
-      } else if (present.length === 1) {
-        // Pase libre: el cuadro ya tiene que haberlo resuelto solo.
-        expect(match.winnerId).toBe(present[0]);
-        winner = present[0];
+
+      if (bye) {
+        // Pase libre: tiene que haber llegado exactamente una pareja y el
+        // cuadro ya tiene que haberla dado por ganadora.
+        expect(here).toHaveLength(1);
+        expect(match.winnerId).toBe(here[0]);
+        winner = here[0];
       } else {
-        throw new Error(`cruce vacío en ronda ${round}, slot ${match.slot}`);
+        // Partido de verdad: las dos parejas y sin ganador puesto de antemano.
+        expect(here).toHaveLength(2);
+        expect(match.winnerId).toBeNull();
+        winner = here[0];
+        played++;
       }
 
-      if (round === totalRounds) {
-        champion = winner;
-        continue;
-      }
+      if (round === counts.length) return { champion: winner, played };
+
       const next = nextMatchPosition(round, match.slot);
       const target = board.get(key(next.round, next.slot))!;
       if (next.position === "A") {
@@ -59,96 +65,142 @@ function playBracket(slots: BracketSlot[]): string {
         if (target.pairBId) expect(target.pairBId).toBe(winner);
         target.pairBId = winner;
       }
+      if (isByeSlot(next.round, next.slot, counts)) target.winnerId = winner;
     }
   }
 
-  if (!champion) throw new Error("el cuadro no terminó en un campeón");
-  return champion;
+  throw new Error("el cuadro no terminó en un campeón");
 }
 
-/** Comprueba las invariantes que tiene que cumplir cualquier cuadro. */
+/** Invariantes que tiene que cumplir cualquier cuadro. */
 function expectValidBracket(slots: BracketSlot[], pairCount: number) {
-  const totalRounds = totalRoundsFor(pairCount);
-  const bracketSize = 2 ** totalRounds;
-
-  expect(Math.max(...slots.map((s) => s.round))).toBe(totalRounds);
-  expect(slots).toHaveLength(bracketSize - 1);
+  const counts = roundSizes(pairCount);
+  expect(slots).toHaveLength(counts.reduce((a, b) => a + b, 0));
+  counts.forEach((count, i) => {
+    expect(slots.filter((s) => s.round === i + 1)).toHaveLength(count);
+  });
 
   const firstRound = slots.filter((s) => s.round === 1);
-  expect(firstRound).toHaveLength(bracketSize / 2);
-
-  // Cada pareja aparece exactamente una vez en la primera ronda.
-  const placed = firstRound.flatMap((s) =>
-    [s.pairAId, s.pairBId].filter((id): id is string => Boolean(id))
-  );
+  const placed = firstRound.flatMap(present);
   expect(placed).toHaveLength(pairCount);
   expect(new Set(placed).size).toBe(pairCount);
+  // Con parejas impares hay exactamente una que pasa libre en la primera ronda.
+  expect(firstRound.filter((s) => present(s).length === 1)).toHaveLength(
+    pairCount % 2
+  );
 
-  // Ningún cruce de primera ronda puede quedar sin nadie.
-  for (const match of firstRound) {
-    expect(Boolean(match.pairAId || match.pairBId)).toBe(true);
-  }
-
-  // Y el cuadro se puede jugar de punta a punta.
-  expect(placed).toContain(playBracket(slots));
+  const { champion, played } = playBracket(slots, pairCount);
+  expect(placed).toContain(champion);
+  // Un cuadro de eliminación siempre define al campeón en n-1 partidos.
+  expect(played).toBe(pairCount - 1);
 }
 
-describe("seedBracket", () => {
-  it("con 4 clasificados arma 2 cruces y la final, sin pases libres", () => {
-    const slots = seedBracket(pairs(4));
-    expect(slots).toHaveLength(3);
-    expect(slots.filter((s) => s.winnerId)).toHaveLength(0);
-    expectValidBracket(slots, 4);
+describe("roundSizes", () => {
+  it("empareja todo lo que puede en cada ronda", () => {
+    expect(roundSizes(5)).toEqual([3, 2, 1]);
+    expect(roundSizes(8)).toEqual([4, 2, 1]);
+    expect(roundSizes(7)).toEqual([4, 2, 1]);
+    expect(roundSizes(6)).toEqual([3, 2, 1]);
+    expect(roundSizes(2)).toEqual([1]);
+    expect(roundSizes(13)).toEqual([7, 4, 2, 1]);
   });
 
-  it("cruza al mejor con el peor seed", () => {
-    const slots = seedBracket(["a", "b", "c", "d"]);
-    const first = slots.filter((s) => s.round === 1);
-    expect([first[0].pairAId, first[0].pairBId]).toEqual(["a", "d"]);
-    expect([first[1].pairAId, first[1].pairBId]).toEqual(["b", "c"]);
+  it("la cantidad de rondas es la esperada", () => {
+    for (let n = 2; n <= 40; n++) {
+      expect(totalRoundsFor(n)).toBe(Math.ceil(Math.log2(n)));
+    }
   });
+});
 
-  it("le da los pases libres a los mejores clasificados", () => {
-    // 5 clasificados en un cuadro de 8: los 3 primeros pasan sin jugar.
-    const slots = seedBracket(pairs(5));
-    const byes = slots
-      .filter((s) => s.round === 1 && s.winnerId)
-      .map((s) => s.winnerId);
-    expect(byes.sort()).toEqual(["p1", "p2", "p3"]);
-    expectValidBracket(slots, 5);
-  });
-
-  it("deja al que pasa libre ya ubicado en la ronda siguiente", () => {
-    const slots = seedBracket(pairs(5));
-    const secondRound = slots.filter((s) => s.round === 2);
-    // p1 pasó libre y espera al ganador del único cruce real.
-    expect(secondRound[0]).toMatchObject({ pairAId: "p1", pairBId: null });
-    // p2 y p3 pasaron libres los dos: su cruce ya es un partido de verdad.
-    expect(secondRound[1]).toMatchObject({
-      pairAId: "p2",
-      pairBId: "p3",
-      winnerId: null,
+describe("bracketPlan", () => {
+  it("anticipa cómo arranca el cuadro", () => {
+    expect(bracketPlan(5)).toMatchObject({
+      firstRoundMatches: 2,
+      firstRoundDirect: 1,
+      totalMatches: 4,
+      rounds: 3,
+    });
+    expect(bracketPlan(8)).toMatchObject({
+      firstRoundMatches: 4,
+      firstRoundDirect: 0,
+      byes: 0,
     });
   });
 
-  it("con 3 clasificados el que pasa libre queda esperando en la final", () => {
-    const slots = seedBracket(pairs(3));
-    expect(slots).toHaveLength(3);
-    const final = slots.find((s) => s.round === 2)!;
-    expect(final).toMatchObject({ pairAId: "p1", pairBId: null, winnerId: null });
-    expectValidBracket(slots, 3);
+  it("cuenta los pases libres de todo el cuadro", () => {
+    // Con 5 parejas: una libre en la primera ronda y otra en la semifinal,
+    // porque a la semi llegan 3.
+    expect(bracketPlan(5).byes).toBe(2);
+    expect(bracketPlan(7).byes).toBe(1);
+  });
+});
+
+describe("seedBracket", () => {
+  it("con 5 parejas arma 3 cruces: 2 partidos y la mejor pasa libre", () => {
+    const slots = seedBracket(pairs(5));
+    const r1 = slots.filter((s) => s.round === 1);
+    expect(r1).toHaveLength(3);
+    expect(r1.filter((s) => present(s).length === 2)).toHaveLength(2);
+    const libre = r1.find((s) => present(s).length === 1)!;
+    expect(libre.pairAId).toBe("p1");
+    expect(libre.winnerId).toBe("p1");
+    expectValidBracket(slots, 5);
   });
 
-  it("con 2 clasificados es una sola final", () => {
-    const slots = seedBracket(pairs(2));
-    expect(slots).toEqual([
-      { round: 1, slot: 0, pairAId: "p1", pairBId: "p2", winnerId: null },
-    ]);
+  it("con 5 parejas la mejor queda esperando en la semifinal", () => {
+    const slots = seedBracket(pairs(5));
+    const semis = slots.filter((s) => s.round === 2);
+    expect(semis).toHaveLength(2);
+    expect(semis[0]).toMatchObject({ pairAId: "p1", pairBId: null });
+    // A la semi llegan 3, así que del otro lado hay un pase libre a la final.
+    expect(isByeSlot(2, 1, roundSizes(5))).toBe(true);
+    expect(isByeSlot(2, 0, roundSizes(5))).toBe(false);
   });
 
-  it("funciona con cualquier cantidad de clasificados, par o impar", () => {
-    for (let n = 2; n <= 33; n++) {
-      expectValidBracket(seedBracket(pairs(n)), n);
+  it("con 8 parejas son 4 partidos y ningún pase libre", () => {
+    const slots = seedBracket(pairs(8));
+    const r1 = slots.filter((s) => s.round === 1);
+    expect(r1).toHaveLength(4);
+    expect(r1.every((s) => present(s).length === 2)).toBe(true);
+    expect(slots.filter((s) => s.winnerId)).toHaveLength(0);
+    expectValidBracket(slots, 8);
+  });
+
+  it("cruza al mejor con el peor", () => {
+    const r1 = seedBracket(pairs(8)).filter((s) => s.round === 1);
+    expect([r1[0].pairAId, r1[0].pairBId]).toEqual(["p1", "p8"]);
+    expect([r1[2].pairAId, r1[2].pairBId]).toEqual(["p2", "p7"]);
+  });
+
+  it("el pase libre de la primera ronda es siempre para la mejor", () => {
+    for (let n = 3; n <= 33; n += 2) {
+      const libre = seedBracket(pairs(n))
+        .filter((s) => s.round === 1)
+        .find((s) => present(s).length === 1)!;
+      expect(libre.pairAId).toBe("p1");
+    }
+  });
+
+  it("los dos mejores seeds sólo se pueden cruzar en la final", () => {
+    for (let n = 4; n <= 33; n++) {
+      const slots = seedBracket(pairs(n));
+      const counts = roundSizes(n);
+      // Mitad del cuadro en la que cae cada caja de la primera ronda: se sube
+      // hasta la ronda que alimenta la final.
+      const branchOf = (slot: number) => {
+        let s = slot;
+        for (let round = 1; round < counts.length - 1; round++) s = Math.floor(s / 2);
+        return s;
+      };
+      const boxOf = (pairId: string) =>
+        slots.find(
+          (s) => s.round === 1 && (s.pairAId === pairId || s.pairBId === pairId)
+        )!.slot;
+      const finalRound = slots.filter((s) => s.round === counts.length);
+      expect(finalRound).toHaveLength(1);
+      // Los dos mejores siempre en mitades distintas del cuadro.
+      expect(branchOf(boxOf("p1"))).not.toBe(branchOf(boxOf("p2")));
+      expectValidBracket(slots, n);
     }
   });
 
@@ -158,9 +210,8 @@ describe("seedBracket", () => {
 });
 
 describe("seedBracket con zonas", () => {
-  /** Zona de cada pareja a partir del nombre "zNpM". */
   const zoneOf = (pairId: string) => Number(pairId[1]);
-  const sameZoneClashes = (slots: BracketSlot[]) =>
+  const clashes = (slots: BracketSlot[]) =>
     slots.filter(
       (s) =>
         s.round === 1 &&
@@ -169,59 +220,77 @@ describe("seedBracket con zonas", () => {
         zoneOf(s.pairAId) === zoneOf(s.pairBId)
     );
 
-  it("no cruza dos parejas de la misma zona en primera ronda (3 zonas, 2 pasan)", () => {
-    // Orden sembrado: 1ros de A, B, C y despues los 2dos rotados.
+  it("no cruza dos parejas de la misma zona en primera ronda", () => {
     const seeded = ["z0p0", "z1p0", "z2p0", "z1p1", "z2p1", "z0p1"];
     const slots = seedBracket(seeded, zoneOf);
-    expect(sameZoneClashes(slots)).toEqual([]);
+    expect(clashes(slots)).toEqual([]);
     expectValidBracket(slots, 6);
   });
 
   it("reacomoda los rivales cuando la siembra deja un cruce de la misma zona", () => {
-    // 2 zonas y 3 clasificados por zona: sin reacomodar, los 2dos y 3ros de
-    // cada zona se cruzarian entre ellos en la primera ronda.
-    const seeded = ["z0p0", "z1p0", "z1p1", "z0p1", "z0p2", "z1p2"];
-    expect(sameZoneClashes(seedBracket(seeded))).toHaveLength(2);
-
+    const seeded = ["z0p0", "z1p0", "z0p1", "z1p1", "z0p2", "z1p2"];
     const slots = seedBracket(seeded, zoneOf);
-    expect(sameZoneClashes(slots)).toEqual([]);
+    expect(clashes(slots)).toEqual([]);
     expectValidBracket(slots, 6);
   });
 
-  it("al reacomodar no le saca el pase libre a los mejores", () => {
-    const seeded = ["z0p0", "z1p0", "z1p1", "z0p1", "z0p2", "z1p2"];
-    const byes = seedBracket(seeded, zoneOf)
-      .filter((s) => s.round === 1 && s.winnerId)
-      .map((s) => s.winnerId);
-    expect(byes.sort()).toEqual(["z0p0", "z1p0"]);
+  it("al reacomodar no le saca el pase libre a la mejor", () => {
+    const seeded = ["z0p0", "z1p0", "z0p1", "z1p1", "z0p2"];
+    const slots = seedBracket(seeded, zoneOf);
+    const libre = slots.find((s) => s.round === 1 && present(s).length === 1)!;
+    expect(libre.pairAId).toBe("z0p0");
+    expect(clashes(slots)).toEqual([]);
   });
 
-  it("no rompe nada cuando hay una sola zona (no se puede evitar el cruce)", () => {
-    const seeded = ["z0p0", "z0p1", "z0p2", "z0p3"];
-    const slots = seedBracket(seeded, zoneOf);
+  it("con una sola zona no rompe nada (el cruce es inevitable)", () => {
+    const slots = seedBracket(["z0p0", "z0p1", "z0p2", "z0p3"], zoneOf);
     expectValidBracket(slots, 4);
   });
 });
 
 describe("generateBracket", () => {
   it("sortea el cuadro y funciona con cualquier cantidad, par o impar", () => {
-    for (let n = 2; n <= 20; n++) {
+    for (let n = 2; n <= 33; n++) {
       expectValidBracket(generateBracket(pairs(n)), n);
     }
   });
 
-  it("reparte los pases libres necesarios en cruces distintos", () => {
-    // 5 parejas en un cuadro de 8: 3 pases libres, cada uno en su cruce.
+  it("con 5 parejas son 2 partidos y una libre, sin cruces vacíos", () => {
     for (let i = 0; i < 20; i++) {
-      const slots = generateBracket(pairs(5));
-      const first = slots.filter((s) => s.round === 1);
-      expect(first.filter((s) => s.winnerId)).toHaveLength(3);
-      expect(first.filter((s) => !s.pairAId && !s.pairBId)).toEqual([]);
+      const r1 = generateBracket(pairs(5)).filter((s) => s.round === 1);
+      expect(r1).toHaveLength(3);
+      expect(r1.filter((s) => present(s).length === 1)).toHaveLength(1);
+      expect(r1.every((s) => present(s).length > 0)).toBe(true);
     }
+  });
+
+  it("respeta a quién le toca el pase libre si el organizador lo elige", () => {
+    for (let i = 0; i < 20; i++) {
+      const slots = generateBracket(pairs(7), "p5");
+      const libre = slots.find((s) => s.round === 1 && present(s).length === 1)!;
+      expect(libre.pairAId).toBe("p5");
+      expect(libre.winnerId).toBe("p5");
+    }
+  });
+
+  it("ignora un pase libre elegido que no está en el cuadro", () => {
+    const slots = generateBracket(pairs(5), "no-existe");
+    expect(slots.filter((s) => s.round === 1 && present(s).length === 1)).toHaveLength(1);
+    expectValidBracket(slots, 5);
   });
 
   it("necesita al menos 2 parejas", () => {
     expect(() => generateBracket(["p1"])).toThrow(/al menos 2 parejas/);
+  });
+});
+
+describe("isByeSlot", () => {
+  it("marca el cruce que no puede tener rival", () => {
+    const counts = roundSizes(5); // [3, 2, 1]
+    expect(isByeSlot(1, 0, counts)).toBe(false);
+    expect(isByeSlot(2, 0, counts)).toBe(false);
+    expect(isByeSlot(2, 1, counts)).toBe(true);
+    expect(isByeSlot(3, 0, counts)).toBe(false);
   });
 });
 

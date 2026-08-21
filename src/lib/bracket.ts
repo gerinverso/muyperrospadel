@@ -9,55 +9,189 @@ export type BracketSlot = {
 };
 
 /**
- * Estado de un cruce mirado desde la ronda siguiente: si ya se sabe quién
- * avanza (`decided`) y quién es (`advancing`, null cuando de ese lado del
- * cuadro no hay nadie).
+ * Cantidad de cruces de cada ronda, de la primera a la final.
+ *
+ * El cuadro no se rellena hasta la potencia de 2 más cercana: en cada ronda se
+ * emparejan todas las parejas que se puedan y la que sobra (si son impares)
+ * pasa libre. Con 5 parejas son 3 cruces (2 partidos y una libre), después 2 y
+ * después la final.
  */
-type Resolved = { decided: boolean; advancing: string | null };
+export function roundSizes(pairCount: number): number[] {
+  const sizes: number[] = [];
+  let remaining = pairCount;
+  while (remaining > 1) {
+    remaining = Math.ceil(remaining / 2);
+    sizes.push(remaining);
+  }
+  return sizes;
+}
+
+export function totalRoundsFor(pairCount: number): number {
+  return roundSizes(pairCount).length;
+}
 
 /**
- * Arma todos los slots del cuadro a partir de las posiciones ya definidas
- * (0-based) de la primera ronda.
+ * Un cruce es un pase libre cuando estructuralmente no puede tener rival: la
+ * ronda anterior no tiene un segundo cruce que le alimente el otro lado. La
+ * pareja que llega ahí avanza sin jugar.
  *
- * Resuelve los pases libres en TODAS las rondas de una sola pasada: si a un
- * cruce le falta el rival porque del otro lado del cuadro no puede haber nadie,
- * la pareja que está sola gana ese cruce y queda ya ubicada en la ronda
- * siguiente. Así el cuadro nunca se queda trabado esperando un rival que no
- * existe, sin importar cuántas parejas haya ni si son pares o impares.
+ * `roundCounts` es la cantidad de cruces por ronda (`roundSizes`).
  */
-function buildBracketSlots(firstRoundPositions: (string | null)[]): BracketSlot[] {
-  const bracketSize = firstRoundPositions.length;
-  const totalRounds = Math.log2(bracketSize);
-  const slots: BracketSlot[] = [];
+export function isByeSlot(
+  round: number,
+  slot: number,
+  roundCounts: number[]
+): boolean {
+  if (round <= 1) return false;
+  return slot * 2 + 1 >= roundCounts[round - 2];
+}
 
-  let previous: Resolved[] = [];
-  for (let slot = 0; slot < bracketSize / 2; slot++) {
-    const pairAId = firstRoundPositions[slot * 2] ?? null;
-    const pairBId = firstRoundPositions[slot * 2 + 1] ?? null;
-    const present = [pairAId, pairBId].filter((id): id is string => Boolean(id));
-    // Con una sola pareja (o ninguna) el cruce ya está resuelto y no se juega.
-    const winnerId = present.length === 1 ? present[0] : null;
-    slots.push({ round: 1, slot, pairAId, pairBId, winnerId });
-    previous.push({ decided: present.length <= 1, advancing: winnerId });
+/**
+ * Orden en el que se le asignan las cajas de la primera ronda a las parejas
+ * sembradas: primero la que le toca a la mejor, después al segundo seed, y así.
+ *
+ * Se arma el árbol de cruces (cada caja alimenta la caja `floor(slot / 2)` de
+ * la ronda siguiente) y se recorre alternando ramas, de modo que los mejores
+ * seeds caigan en mitades distintas del cuadro y se cruzen lo más tarde
+ * posible.
+ */
+function boxSeedOrder(boxCount: number): number[] {
+  type Node = number | { a: Node; b?: Node };
+
+  let level: Node[] = Array.from({ length: boxCount }, (_, i) => i);
+  while (level.length > 1) {
+    const next: Node[] = [];
+    for (let i = 0; i < level.length; i += 2) {
+      next.push({ a: level[i], b: level[i + 1] });
+    }
+    level = next;
   }
 
-  for (let round = 2; round <= totalRounds; round++) {
+  const order = (node: Node): number[] => {
+    if (typeof node === "number") return [node];
+    const first = order(node.a);
+    const second = node.b === undefined ? [] : order(node.b);
+    const merged: number[] = [];
+    for (let i = 0; i < Math.max(first.length, second.length); i++) {
+      if (i < first.length) merged.push(first[i]);
+      if (i < second.length) merged.push(second[i]);
+    }
+    return merged;
+  };
+
+  return boxCount === 0 ? [] : order(level[0]);
+}
+
+/**
+ * Reparte las parejas (ya ordenadas por seed, mejor primero) en las cajas de la
+ * primera ronda.
+ *
+ * Si son impares, la mejor pareja se queda sola en su caja y pasa libre. Las
+ * demás se cruzan mejor contra peor, empezando por las cajas de más prioridad.
+ */
+function layoutFirstRound(orderedPairIds: string[]): string[][] {
+  const boxCount = Math.ceil(orderedPairIds.length / 2);
+  const boxes: string[][] = Array.from({ length: boxCount }, () => []);
+  const priority = boxSeedOrder(boxCount);
+  const rest = [...orderedPairIds];
+
+  if (rest.length % 2 === 1) {
+    boxes[priority[0]] = [rest.shift()!];
+  }
+  for (const box of priority) {
+    if (boxes[box].length > 0) continue;
+    boxes[box] = [rest.shift()!, rest.pop()!];
+  }
+
+  return boxes;
+}
+
+/**
+ * Reacomoda la primera ronda para que no se cruzen dos parejas de la misma
+ * zona. Intercambia rivales entre cruces reales (nunca toca la caja del pase
+ * libre, así la mejor pareja lo conserva) y prefiere el cruce más cercano para
+ * alterar lo menos posible la siembra. Si no hay ningún intercambio que sirva
+ * deja el cruce como está: con muchos clasificados de pocas zonas es inevitable.
+ */
+function avoidSameZoneClashes(
+  boxes: string[][],
+  zoneOf: (pairId: string) => number | undefined
+): void {
+  const clashes = (box: string[]) =>
+    box.length === 2 &&
+    zoneOf(box[0]) !== undefined &&
+    zoneOf(box[0]) === zoneOf(box[1]);
+
+  for (let i = 0; i < boxes.length; i++) {
+    if (!clashes(boxes[i])) continue;
+
+    let best = -1;
+    for (let j = 0; j < boxes.length; j++) {
+      if (j === i || boxes[j].length !== 2) continue;
+      const fixesThis = zoneOf(boxes[i][0]) !== zoneOf(boxes[j][1]);
+      const keepsOther = zoneOf(boxes[j][0]) !== zoneOf(boxes[i][1]);
+      if (fixesThis && keepsOther) {
+        if (best === -1 || Math.abs(j - i) < Math.abs(best - i)) best = j;
+      }
+    }
+
+    if (best !== -1) {
+      [boxes[i][1], boxes[best][1]] = [boxes[best][1], boxes[i][1]];
+    }
+  }
+}
+
+/** Estado de un cruce visto desde la ronda siguiente. */
+type Resolved = {
+  /** false cuando es un pase libre: nadie puede venir del otro lado. */
+  plays: boolean;
+  /** La pareja que avanza, si ya se sabe. */
+  advancing: string | null;
+};
+
+/**
+ * Arma todos los cruces del cuadro a partir de las cajas de la primera ronda.
+ *
+ * Los pases libres se resuelven solos: si a una caja no le puede llegar rival,
+ * la pareja que está ahí gana ese cruce y queda ya ubicada en la ronda
+ * siguiente. Cuando el pase libre es de una ronda posterior todavía no se sabe
+ * quién va a llegar, así que la caja queda vacía y la resuelve el endpoint que
+ * carga los resultados en cuanto se define el partido que la alimenta.
+ */
+function buildBracketSlots(boxes: string[][]): BracketSlot[] {
+  const slots: BracketSlot[] = [];
+
+  let previous: Resolved[] = boxes.map((box, slot) => {
+    const [pairAId = null, pairBId = null] = box;
+    const plays = box.length === 2;
+    slots.push({
+      round: 1,
+      slot,
+      pairAId,
+      pairBId,
+      winnerId: plays ? null : pairAId,
+    });
+    return { plays, advancing: plays ? null : pairAId };
+  });
+
+  const counts = roundSizes(boxes.reduce((total, box) => total + box.length, 0));
+  for (let round = 2; round <= counts.length; round++) {
     const current: Resolved[] = [];
-    const matchesInRound = bracketSize / 2 ** round;
-    for (let slot = 0; slot < matchesInRound; slot++) {
+    for (let slot = 0; slot < counts[round - 1]; slot++) {
       const feederA = previous[slot * 2];
       const feederB = previous[slot * 2 + 1];
-      const pairAId = feederA.decided ? feederA.advancing : null;
-      const pairBId = feederB.decided ? feederB.advancing : null;
-      const present = [pairAId, pairBId].filter((id): id is string =>
-        Boolean(id)
-      );
-      // Sólo se sabe el resultado si ya está definido lo que llega por los dos
-      // lados y de uno de ellos no viene nadie.
-      const decided = feederA.decided && feederB.decided && present.length <= 1;
-      const winnerId = decided && present.length === 1 ? present[0] : null;
-      slots.push({ round, slot, pairAId, pairBId, winnerId });
-      current.push({ decided, advancing: winnerId });
+      const pairAId = feederA?.advancing ?? null;
+      const pairBId = feederB?.advancing ?? null;
+      // Sin segundo alimentador el cruce es un pase libre.
+      const plays = feederB !== undefined;
+      slots.push({
+        round,
+        slot,
+        pairAId,
+        pairBId,
+        winnerId: plays ? null : pairAId,
+      });
+      current.push({ plays, advancing: plays ? null : pairAId });
     }
     previous = current;
   }
@@ -66,115 +200,58 @@ function buildBracketSlots(firstRoundPositions: (string | null)[]): BracketSlot[
 }
 
 /**
- * Genera el cuadro de eliminación directa sorteando la ubicación de cada
- * pareja. Si la cantidad no es potencia de 2 se reparten pases libres al azar.
- * Es el camino de los torneos sin fase de grupos: no hay tabla previa, así que
- * no hay a quién darle el pase libre por mérito.
+ * Cómo queda un cuadro de `pairCount` parejas, para poder anunciarlo antes de
+ * armarlo: cuántos partidos se juegan en la primera ronda, si alguna pareja
+ * pasa libre, cuántos partidos tiene en total y cuántos pases libres hay
+ * sumando todas las rondas.
  */
-export function generateBracket(pairIds: string[]): BracketSlot[] {
+export function bracketPlan(pairCount: number): {
+  rounds: number;
+  firstRoundMatches: number;
+  firstRoundDirect: number;
+  totalMatches: number;
+  byes: number;
+} {
+  const counts = roundSizes(pairCount);
+  const boxes = counts.reduce((total, count) => total + count, 0);
+  const totalMatches = Math.max(0, pairCount - 1);
+  return {
+    rounds: counts.length,
+    firstRoundMatches: Math.floor(pairCount / 2),
+    firstRoundDirect: pairCount % 2,
+    totalMatches,
+    byes: boxes - totalMatches,
+  };
+}
+
+/**
+ * Genera el cuadro sorteando la ubicación de cada pareja. Es el camino de los
+ * torneos sin fase de grupos: no hay tabla previa, así que si son impares el
+ * pase libre se sortea, salvo que el organizador elija a quién le toca con
+ * `byePairId`.
+ */
+export function generateBracket(
+  pairIds: string[],
+  byePairId?: string | null
+): BracketSlot[] {
   if (pairIds.length < 2) {
     throw new Error("Se necesitan al menos 2 parejas para armar el cuadro");
   }
 
-  const shuffledPairIds = shuffle(pairIds);
-  const bracketSize = 2 ** Math.ceil(Math.log2(shuffledPairIds.length));
-  const matchCount = bracketSize / 2;
-  const byesNeeded = bracketSize - shuffledPairIds.length;
-
-  // Los byes van en cruces DISTINTOS: si dos cayeran en el mismo, ese cruce
-  // quedaría sin ninguna pareja. Siempre alcanza, porque la cantidad de byes es
-  // menor a la de cruces.
-  const byeMatches = new Set(
-    shuffle(Array.from({ length: matchCount }, (_, i) => i)).slice(0, byesNeeded)
-  );
-
-  const firstRoundPositions: (string | null)[] = [];
-  let nextPair = 0;
-  for (let match = 0; match < matchCount; match++) {
-    if (byeMatches.has(match)) {
-      // Se sortea de qué lado del cruce queda el pase libre.
-      const byeOnA = Math.random() < 0.5;
-      firstRoundPositions.push(byeOnA ? null : shuffledPairIds[nextPair++]);
-      firstRoundPositions.push(byeOnA ? shuffledPairIds[nextPair++] : null);
-    } else {
-      firstRoundPositions.push(shuffledPairIds[nextPair++]);
-      firstRoundPositions.push(shuffledPairIds[nextPair++]);
-    }
+  const shuffled = shuffle(pairIds);
+  // La primera de la lista es la que se queda sola cuando son impares.
+  if (byePairId && shuffled.includes(byePairId)) {
+    shuffled.splice(shuffled.indexOf(byePairId), 1);
+    shuffled.unshift(byePairId);
   }
 
-  return buildBracketSlots(firstRoundPositions);
-}
-
-/** Arma la secuencia estándar de seeds (1-indexados) para un cuadro de
- * `size` posiciones (potencia de 2), de forma que el seed 1 y el último
- * seed disponible se enfrenten en la primera ronda, evitando que los
- * primeros puestos se crucen antes de tiempo. */
-function standardSeedOrder(size: number): number[] {
-  let seeds = [1];
-  while (seeds.length < size) {
-    const n = seeds.length * 2 + 1;
-    const next: number[] = [];
-    for (const s of seeds) next.push(s, n - s);
-    seeds = next;
-  }
-  return seeds;
-}
-
-/**
- * Reacomoda la primera ronda para que no se cruzen dos parejas de la misma
- * zona. Intercambia rivales (el lado B de dos cruces) entre cruces reales:
- * nunca toca un pase libre, así el bye sigue quedando en las mejores parejas
- * como manda la siembra. Prefiere el cruce más cercano para alterar lo menos
- * posible el orden sembrado y, si no hay ningún intercambio que sirva, deja el
- * cruce como está (con muchos clasificados de pocas zonas es inevitable).
- */
-function avoidSameZoneClashes(
-  positions: (string | null)[],
-  zoneOf: (pairId: string) => number | undefined
-): void {
-  const matchCount = positions.length / 2;
-  const zoneAt = (i: number) => {
-    const id = positions[i];
-    return id ? zoneOf(id) : undefined;
-  };
-  const clashes = (match: number) => {
-    const a = zoneAt(match * 2);
-    const b = zoneAt(match * 2 + 1);
-    return a !== undefined && a === b;
-  };
-
-  for (let i = 0; i < matchCount; i++) {
-    if (!clashes(i)) continue;
-
-    let best = -1;
-    for (let j = 0; j < matchCount; j++) {
-      if (j === i) continue;
-      // Sólo entre cruces con las dos parejas presentes: mover un hueco
-      // cambiaría a quién le toca el pase libre.
-      if (!positions[j * 2] || !positions[j * 2 + 1]) continue;
-      const zoneA = zoneAt(i * 2);
-      const zoneB = zoneAt(i * 2 + 1);
-      const otherA = zoneAt(j * 2);
-      const otherB = zoneAt(j * 2 + 1);
-      const fixesThis = zoneA === undefined || zoneA !== otherB;
-      const keepsOther = otherA === undefined || otherA !== zoneB;
-      if (fixesThis && keepsOther) {
-        if (best === -1 || Math.abs(j - i) < Math.abs(best - i)) best = j;
-      }
-    }
-
-    if (best !== -1) {
-      const a = i * 2 + 1;
-      const b = best * 2 + 1;
-      [positions[a], positions[b]] = [positions[b], positions[a]];
-    }
-  }
+  return buildBracketSlots(layoutFirstRound(shuffled));
 }
 
 /**
  * Genera el cuadro a partir de una lista de parejas YA ordenada por seed (mejor
- * ubicada primero), sin sortear nada. Se usa para el cuadro final de la fase de
- * grupos: los pases libres caen en los mejores seeds y, si se pasa `zoneOf`, se
+ * primero), sin sortear nada. Se usa para el cuadro final de la fase de grupos:
+ * si son impares el pase libre es para la mejor y, si se pasa `zoneOf`, se
  * evita que dos parejas de la misma zona se cruzen en la primera ronda.
  */
 export function seedBracket(
@@ -185,23 +262,13 @@ export function seedBracket(
     throw new Error("Se necesitan al menos 2 parejas para armar el cuadro");
   }
 
-  const bracketSize = 2 ** Math.ceil(Math.log2(orderedPairIds.length));
-  const seedPositions = standardSeedOrder(bracketSize);
+  const boxes = layoutFirstRound(orderedPairIds);
+  if (zoneOf) avoidSameZoneClashes(boxes, zoneOf);
 
-  const firstRoundPositions: (string | null)[] = seedPositions.map((seed) =>
-    seed <= orderedPairIds.length ? orderedPairIds[seed - 1] : null
-  );
-
-  if (zoneOf) avoidSameZoneClashes(firstRoundPositions, zoneOf);
-
-  return buildBracketSlots(firstRoundPositions);
+  return buildBracketSlots(boxes);
 }
 
-export function totalRoundsFor(pairCount: number): number {
-  return Math.ceil(Math.log2(pairCount));
-}
-
-/** Calcula en que partido de la ronda siguiente cae el ganador de round/slot. */
+/** Calcula en qué cruce de la ronda siguiente cae el ganador de round/slot. */
 export function nextMatchPosition(
   round: number,
   slot: number
@@ -214,10 +281,10 @@ export function nextMatchPosition(
 }
 
 /**
- * Devuelve la cadena de partidos hacia adelante (hacia la final) a los que
- * alimenta el partido en round/slot, con la posicion (A/B) que ocupa el
- * ganador en cada uno. Sirve para propagar o limpiar resultados cuando se
- * corrige el ganador de un partido ya jugado.
+ * Devuelve la cadena de cruces hacia adelante (hacia la final) a los que
+ * alimenta el cruce en round/slot, con la posición (A/B) que ocupa el ganador
+ * en cada uno. Sirve para propagar o limpiar resultados cuando se corrige el
+ * ganador de un partido ya jugado.
  */
 export function forwardPath(
   round: number,

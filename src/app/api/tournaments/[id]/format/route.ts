@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ensureAdmin, unauthorized } from "@/lib/api-utils";
 import { groupSizes } from "@/lib/groups";
+import { bracketPlan } from "@/lib/bracket";
 
 const FORMATS = ["SINGLE_ELIMINATION", "GROUPS_KO"] as const;
 
@@ -112,12 +113,10 @@ export async function POST(
         "Con esta configuración clasifican todas las parejas: la fase de grupos no elimina a nadie."
       );
     }
-    const bracketSize = 2 ** Math.ceil(Math.log2(Math.max(qualifierCount, 2)));
-    if (bracketSize > qualifierCount) {
+    const plan = bracketPlan(Math.max(qualifierCount, 2));
+    if (plan.byes > 0) {
       warnings.push(
-        `Clasifican ${qualifierCount} parejas: el cuadro es de ${bracketSize}, así que ${
-          bracketSize - qualifierCount
-        } van a pasar libres la primera ronda.`
+        `Clasifican ${qualifierCount} parejas: el cuadro son ${plan.totalMatches} partidos y ${plan.byes} pase(s) libre(s), porque hay rondas que quedan con cantidad impar.`
       );
     }
   }

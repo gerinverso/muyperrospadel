@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { TournamentDetail, TournamentFormat } from "@/lib/types";
 import { formatLabels } from "@/lib/types";
 import { groupSizes } from "@/lib/groups";
+import { bracketPlan } from "@/lib/bracket";
 
 /**
  * Formato del torneo: eliminación directa o fase de grupos con N zonas y N
@@ -49,8 +50,7 @@ export default function FormatSection({
   const qualifierCount = validQualifiers
     ? sizes.reduce((total, size) => total + Math.min(qualifiers, size), 0)
     : 0;
-  const bracketSize =
-    qualifierCount >= 2 ? 2 ** Math.ceil(Math.log2(qualifierCount)) : 0;
+  const plan = qualifierCount >= 2 ? bracketPlan(qualifierCount) : null;
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -134,13 +134,18 @@ export default function FormatSection({
                 <strong className="text-on-surface">{sizes.join("-")}</strong>{" "}
                 parejas · clasifican{" "}
                 <strong className="text-on-surface">{qualifierCount}</strong>
-                {bracketSize > 0 && (
+                {plan && (
                   <>
                     {" "}
                     · cuadro de{" "}
-                    <strong className="text-on-surface">{bracketSize}</strong>
-                    {bracketSize > qualifierCount &&
-                      ` (${bracketSize - qualifierCount} pasan libres)`}
+                    <strong className="text-on-surface">
+                      {plan.totalMatches}
+                    </strong>{" "}
+                    partidos
+                    {plan.byes > 0 &&
+                      ` (${plan.byes} pase${plan.byes === 1 ? "" : "s"} libre${
+                        plan.byes === 1 ? "" : "s"
+                      })`}
                   </>
                 )}
               </p>

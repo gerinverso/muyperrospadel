@@ -2,6 +2,7 @@
 
 import type { Match } from "@/lib/types";
 import { pairLabel } from "@/lib/types";
+import { isByeSlot } from "@/lib/bracket";
 import { roundName } from "@/lib/round-names";
 
 export default function BracketView({
@@ -17,6 +18,13 @@ export default function BracketView({
 
   const totalRounds = Math.max(...matches.map((m) => m.round));
   const rounds = Array.from({ length: totalRounds }, (_, i) => i + 1);
+
+  // Cuántos cruces tiene cada ronda: con eso se sabe qué cruces son un pase
+  // libre (los que no pueden tener rival porque la ronda anterior no tiene un
+  // segundo partido que los alimente).
+  const roundCounts = rounds.map(
+    (round) => matches.filter((m) => m.round === round).length
+  );
 
   const finalMatch = matches.find((m) => m.round === totalRounds);
   const champion = finalMatch?.winner ?? null;
@@ -46,6 +54,11 @@ export default function BracketView({
                 <MatchCard
                   key={m.id}
                   match={m}
+                  bye={
+                    round === 1
+                      ? Boolean(m.pairA) !== Boolean(m.pairB)
+                      : isByeSlot(round, m.slot, roundCounts)
+                  }
                   onPickWinner={onPickWinner}
                   busy={busyMatchId === m.id}
                 />
@@ -81,10 +94,13 @@ export default function BracketView({
 
 function MatchCard({
   match,
+  bye,
   onPickWinner,
   busy,
 }: {
   match: Match;
+  /** El cruce no puede tener rival: la pareja que llega pasa sin jugar. */
+  bye: boolean;
   onPickWinner?: (matchId: string, winnerId: string) => void;
   busy?: boolean;
 }) {
@@ -93,8 +109,24 @@ function MatchCard({
   const canPick =
     Boolean(onPickWinner) && Boolean(match.pairA) && Boolean(match.pairB);
   const decided = Boolean(match.winner);
-  // Cruce con una sola pareja y ganador: paso libre, no hay rival por venir.
-  const bye = decided && (!match.pairA || !match.pairB);
+
+  if (bye) {
+    const pair = match.pairA ?? match.pairB;
+    return (
+      <div className="card-border overflow-hidden rounded-lg bg-surface-container-high">
+        <PairRow
+          pair={pair}
+          isWinner={Boolean(match.winner)}
+          dimmed={false}
+          clickable={false}
+          onClick={() => {}}
+        />
+        <p className="font-label-caps text-label-caps border-t border-surface-bright px-3 py-1 text-on-surface-variant">
+          Pasa libre
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -108,7 +140,6 @@ function MatchCard({
         dimmed={decided && match.winner?.id !== match.pairA?.id}
         clickable={canPick}
         disabled={busy}
-        bye={bye}
         onClick={() => match.pairA && onPickWinner?.(match.id, match.pairA.id)}
       />
       <div className="flex items-center gap-2 px-2">
@@ -124,7 +155,6 @@ function MatchCard({
         dimmed={decided && match.winner?.id !== match.pairB?.id}
         clickable={canPick}
         disabled={busy}
-        bye={bye}
         onClick={() => match.pairB && onPickWinner?.(match.id, match.pairB.id)}
       />
     </div>
@@ -137,7 +167,6 @@ function PairRow({
   dimmed,
   clickable,
   disabled,
-  bye,
   onClick,
 }: {
   pair: Match["pairA"];
@@ -145,10 +174,9 @@ function PairRow({
   dimmed: boolean;
   clickable: boolean;
   disabled?: boolean;
-  bye?: boolean;
   onClick: () => void;
 }) {
-  const label = pair ? pairLabel(pair) : bye ? "Libre" : "A definir";
+  const label = pairLabel(pair);
   const baseClasses =
     "flex w-full items-center gap-1.5 px-3 py-2 text-left text-sm";
   const stateClasses = isWinner

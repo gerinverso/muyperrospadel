@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { loadTournamentDetail } from "@/lib/tournament-query";
 import { ensureAdmin, unauthorized } from "@/lib/api-utils";
-import { forwardPath } from "@/lib/bracket";
+import { forwardPath, isByeSlot } from "@/lib/bracket";
+import { loadTournamentDetail } from "@/lib/tournament-query";
 
 export async function POST(
   req: NextRequest,
@@ -53,73 +53,86 @@ export async function POST(
       );
     }
     await prisma.match.update({ where: { id: matchId }, data: { winnerId } });
-  } else {
-    // Partido de cuadro de eliminación. Si se cambia el ganador de un partido
-    // ya jugado, se propaga el nuevo ganador a la ronda siguiente y se limpian
-    // en cascada los resultados posteriores que dependían del ganador anterior.
-    if (match.winnerId !== winnerId) {
-      const maxRoundAgg = await prisma.match.aggregate({
-        where: { tournamentId: id, groupId: null },
-        _max: { round: true },
-      });
-      const totalRounds = maxRoundAgg._max.round ?? match.round;
-
-      await prisma.$transaction(async (tx) => {
-        await tx.match.update({
-          where: { id: matchId },
-          data: { winnerId },
-        });
-
-        const path = forwardPath(match.round, match.slot, totalRounds);
-        // `incoming` es la pareja que debe entrar en el siguiente partido de la
-        // cadena. Tras el primer paso pasa a null para ir limpiando los slots
-        // que quedaron sin ganador definido aguas abajo.
-        let incoming: string | null = winnerId;
-        for (const step of path) {
-          const nextMatch = await tx.match.findUnique({
-            where: {
-              tournamentId_round_slot: {
-                tournamentId: id,
-                round: step.round,
-                slot: step.slot,
-              },
-            },
-          });
-          const slotData =
-            step.position === "A"
-              ? { pairAId: incoming }
-              : { pairBId: incoming };
-          const hadWinner = nextMatch?.winnerId != null;
-          await tx.match.update({
-            where: {
-              tournamentId_round_slot: {
-                tournamentId: id,
-                round: step.round,
-                slot: step.slot,
-              },
-            },
-            data: hadWinner ? { ...slotData, winnerId: null } : slotData,
-          });
-          // Si este partido no tenía ganador, nada más adelante dependía de él.
-          if (!hadWinner) break;
-          incoming = null;
-        }
-
-        // El estado del torneo depende de si la final ya tiene ganador.
-        const finalMatch = await tx.match.findFirst({
-          where: { tournamentId: id, groupId: null, round: totalRounds },
-        });
-        await tx.tournament.update({
-          where: { id },
-          data: {
-            status: finalMatch?.winnerId ? "FINISHED" : "IN_PROGRESS",
-          },
-        });
-      });
-    }
+    return NextResponse.json(await loadTournamentDetail(id));
   }
 
-  const updated = await loadTournamentDetail(id);
+  if (match.winnerId !== winnerId) {
+    await propagate(id, match.round, match.slot, matchId, winnerId);
+  }
 
-  return NextResponse.json(updated);
+  return NextResponse.json(await loadTournamentDetail(id));
+}
+
+/**
+ * Guarda el ganador de un cruce del cuadro y lo lleva a la ronda siguiente.
+ *
+ * Si se cambia el ganador de un partido ya jugado, limpia en cascada los
+ * resultados posteriores que dependían del anterior. Los cruces que son un pase
+ * libre (no pueden tener rival) se resuelven al toque con la pareja que llega,
+ * así el ganador sigue avanzando sin que nadie tenga que tocar nada.
+ */
+async function propagate(
+  tournamentId: string,
+  round: number,
+  slot: number,
+  matchId: string,
+  winnerId: string
+) {
+  // La cantidad de cruces por ronda define qué cruces son pase libre: se lee
+  // del cuadro guardado, que es la fuente de verdad.
+  const rounds = await prisma.match.groupBy({
+    by: ["round"],
+    where: { tournamentId, groupId: null },
+    _count: { _all: true },
+  });
+  const roundCounts: number[] = [];
+  for (const row of rounds) roundCounts[row.round - 1] = row._count._all;
+  const totalRounds = roundCounts.length;
+
+  await prisma.$transaction(async (tx) => {
+    await tx.match.update({ where: { id: matchId }, data: { winnerId } });
+
+    // `incoming` es la pareja que debe entrar en el cruce siguiente de la
+    // cadena. Después del primer paso pasa a null para ir limpiando los cruces
+    // que quedaron sin ganador definido aguas abajo.
+    let incoming: string | null = winnerId;
+
+    for (const step of forwardPath(round, slot, totalRounds)) {
+      const where = {
+        tournamentId_round_slot: {
+          tournamentId,
+          round: step.round,
+          slot: step.slot,
+        },
+      };
+      const nextMatch = await tx.match.findUnique({ where });
+      const hadWinner = nextMatch?.winnerId != null;
+      const bye = isByeSlot(step.round, step.slot, roundCounts);
+      const slotData =
+        step.position === "A" ? { pairAId: incoming } : { pairBId: incoming };
+
+      await tx.match.update({
+        where,
+        data: bye
+          ? { ...slotData, winnerId: incoming }
+          : hadWinner
+            ? { ...slotData, winnerId: null }
+            : slotData,
+      });
+
+      // Un pase libre no corta la cadena: la misma pareja sigue avanzando.
+      if (bye) continue;
+      // Si este cruce no tenía ganador, nada más adelante dependía de él.
+      if (!hadWinner) break;
+      incoming = null;
+    }
+
+    const finalMatch = await tx.match.findFirst({
+      where: { tournamentId, groupId: null, round: totalRounds },
+    });
+    await tx.tournament.update({
+      where: { id: tournamentId },
+      data: { status: finalMatch?.winnerId ? "FINISHED" : "IN_PROGRESS" },
+    });
+  });
 }

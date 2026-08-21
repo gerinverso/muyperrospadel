@@ -9,8 +9,9 @@ import type {
   TournamentFormat,
   TournamentStatus,
 } from "@/lib/types";
-import { statusLabels } from "@/lib/types";
+import { pairLabel, statusLabels } from "@/lib/types";
 import { computeQualifiers, toGroupMatchResults } from "@/lib/groups";
+import { bracketPlan } from "@/lib/bracket";
 import BracketView from "@/components/BracketView";
 import GroupsView, { type GroupSettings } from "@/components/GroupsView";
 import PlayersSection from "@/components/admin/PlayersSection";
@@ -54,6 +55,8 @@ export default function AdminTournamentPanel({
   const [busy, setBusy] = useState(false);
   const [busyMatchId, setBusyMatchId] = useState<string | null>(null);
   const [formatWarnings, setFormatWarnings] = useState<string[]>([]);
+  // Quien pasa libre cuando el sorteo es de una cantidad impar de parejas.
+  const [byePairId, setByePairId] = useState("");
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/tournaments/${tournamentId}`, {
@@ -242,6 +245,11 @@ export default function AdminTournamentPanel({
       status === "GROUP_STAGE" &&
       groupStageDone);
   const summary = qualifierSummary(tournament);
+  // El cuadro se arma con los clasificados (fase de grupos) o con todas las
+  // parejas (eliminacion directa).
+  const bracketPairCount =
+    tournament.format === "GROUPS_KO" ? summary.count : pairCount;
+  const plan = bracketPlan(Math.max(bracketPairCount, 2));
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-10">
@@ -414,15 +422,52 @@ export default function AdminTournamentPanel({
           </h2>
           <p className="mb-3 text-sm text-on-surface-variant">
             {tournament.format === "GROUPS_KO"
-              ? `Clasifican ${summary.count} parejas: cuadro de ${summary.bracketSize}${
-                  summary.byes > 0
-                    ? `, con ${summary.byes} pase(s) libre(s) para las mejores`
-                    : ""
-                }. Las parejas de la misma zona no se cruzan en la primera ronda.`
-              : `Se sortea el cruce de ${pairCount} parejas al azar.`}
+              ? `Clasifican ${summary.count} parejas: ${plan.firstRoundMatches} partido(s) en la primera ronda`
+              : `Se sortea el cruce de ${pairCount} parejas: ${plan.firstRoundMatches} partido(s) en la primera ronda`}
+            {plan.firstRoundDirect === 1 &&
+              (tournament.format === "GROUPS_KO"
+                ? " y la mejor pasa libre"
+                : " y una pasa libre")}
+            {`. ${plan.totalMatches} partidos en total.`}
+            {tournament.format === "GROUPS_KO" &&
+              " Las parejas de la misma zona no se cruzan en la primera ronda."}
           </p>
+
+          {plan.byes > 1 && (
+            <p className="mb-3 rounded-md bg-surface-dim px-3 py-2 text-sm text-on-surface-variant">
+              ⚠ Con {bracketPairCount} parejas el cuadro tiene {plan.byes} pases
+              libres: cada ronda que queda con cantidad impar deja una pareja sin
+              rival. Es inevitable con esa cantidad.
+            </p>
+          )}
+
+          {tournament.format === "SINGLE_ELIMINATION" &&
+            plan.firstRoundDirect === 1 && (
+              <label className="mb-3 flex flex-wrap items-center gap-2 text-sm text-on-surface-variant">
+                Pasa libre en la primera ronda:
+                <select
+                  value={byePairId}
+                  onChange={(e) => setByePairId(e.target.value)}
+                  className="rounded-md border border-surface-bright bg-surface-dim px-2 py-1.5 text-sm text-on-surface outline-none focus:border-primary-fixed"
+                >
+                  <option value="">La que salga en el sorteo</option>
+                  {tournament.pairs.map((pair) => (
+                    <option key={pair.id} value={pair.id}>
+                      {pairLabel(pair)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+
           <button
-            onClick={() => send("/generate-bracket", undefined, "Error al armar el cuadro")}
+            onClick={() =>
+              send(
+                "/generate-bracket",
+                byePairId ? { byePairId } : {},
+                "Error al armar el cuadro"
+              )
+            }
             disabled={busy}
             className="rounded-md bg-primary-fixed px-4 py-2 font-medium text-on-primary-fixed hover:bg-primary-fixed-dim disabled:opacity-50"
           >
