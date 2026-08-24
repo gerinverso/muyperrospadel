@@ -43,7 +43,7 @@ export default async function PublicTournamentPage({
             className="object-contain p-3"
           />
         </div>
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <h1 className="font-headline-md text-headline-md text-on-surface">
             {tournament.name}
           </h1>

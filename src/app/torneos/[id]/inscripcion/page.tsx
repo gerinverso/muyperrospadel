@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { countdownLabel } from "@/lib/countdown";
 import RegistrationForm from "@/components/RegistrationForm";
+import Icon from "@/components/Icon";
 
 export const dynamic = "force-dynamic";
 
@@ -87,9 +88,7 @@ export default async function RegistrationPage({
         </>
       ) : (
         <section className="card-border rounded-lg bg-surface-container p-space-md text-center">
-          <span className="material-symbols-outlined text-4xl text-on-surface-variant">
-            lock
-          </span>
+          <Icon name="lock" className="text-4xl text-on-surface-variant" />
           <p className="font-headline-md text-headline-md mt-2 text-on-surface">
             Las inscripciones están cerradas
           </p>

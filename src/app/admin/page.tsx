@@ -21,7 +21,7 @@ export default async function AdminDashboard() {
   return (
     <div className="flex flex-1 flex-col items-center px-4 py-12">
       <div className="w-full max-w-2xl">
-        <header className="mb-8 flex items-center justify-between">
+        <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="font-headline-md text-headline-md text-on-surface">
               Panel de administrador
@@ -30,7 +30,7 @@ export default async function AdminDashboard() {
               Hola, {session.adminName} 👋
             </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <Link
               href="/admin/jugadores"
               className="card-border rounded-lg bg-surface-container px-4 py-2 text-sm font-medium text-on-surface hover:bg-surface-container-high"
@@ -61,7 +61,7 @@ export default async function AdminDashboard() {
               <li key={t.id}>
                 <Link
                   href={`/admin/tournaments/${t.id}`}
-                  className="card-border flex items-center justify-between rounded-lg bg-surface-container p-4 transition hover:border-primary-fixed"
+                  className="card-border flex flex-wrap items-center justify-between gap-2 rounded-lg bg-surface-container p-4 transition hover:border-primary-fixed"
                 >
                   <div>
                     <p className="font-semibold text-on-surface">{t.name}</p>

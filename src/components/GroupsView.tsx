@@ -7,6 +7,7 @@ import {
   toGroupMatchResults,
   type StandingRow,
 } from "@/lib/groups";
+import Icon from "@/components/Icon";
 
 export type GroupSettings = {
   qualifiers?: number | null;
@@ -88,11 +89,9 @@ function ZoneCard({
   return (
     <div className="card-border overflow-hidden rounded-xl bg-surface-container-high">
       {/* Encabezado de zona con acento neón */}
-      <div className="flex items-center justify-between border-b border-surface-bright bg-surface-container px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-surface-bright bg-surface-container px-4 py-3">
         <div className="flex items-center gap-2">
-          <span className="material-symbols-outlined text-primary-fixed">
-            groups
-          </span>
+          <Icon name="groups" className="text-xl text-primary-fixed" />
           <h3 className="font-headline-md text-headline-md uppercase tracking-tight text-on-surface">
             {group.name}
           </h3>
@@ -284,9 +283,7 @@ function ZoneMatchRow({
     const content = (
       <>
         {isWinner && (
-          <span className="material-symbols-outlined shrink-0 text-base text-primary-fixed">
-            emoji_events
-          </span>
+          <Icon name="trophy" className="text-base text-primary-fixed" />
         )}
         <span className="truncate">{label}</span>
       </>

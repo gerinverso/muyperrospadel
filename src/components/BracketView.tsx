@@ -3,6 +3,7 @@
 import type { Match } from "@/lib/types";
 import { pairLabel } from "@/lib/types";
 import { roundName } from "@/lib/round-names";
+import Icon from "@/components/Icon";
 
 export default function BracketView({
   matches,
@@ -69,9 +70,7 @@ export default function BracketView({
           </div>
           <div className="flex flex-1 items-center">
             <div className="neon-glow w-full rounded-xl border border-primary-fixed bg-surface-container p-4 text-center">
-              <span className="material-symbols-outlined text-4xl text-primary-fixed">
-                emoji_events
-              </span>
+              <Icon name="trophy" className="text-4xl text-primary-fixed" />
               <p className="mt-1 font-bold text-on-surface">
                 {pairLabel(champion)}
               </p>
@@ -182,9 +181,7 @@ function PairRow({
     <>
       <span className="min-w-0 flex-1 truncate">{label}</span>
       {isWinner && (
-        <span className="material-symbols-outlined shrink-0 text-base text-primary-fixed">
-          emoji_events
-        </span>
+        <Icon name="trophy" className="text-base text-primary-fixed" />
       )}
     </>
   );

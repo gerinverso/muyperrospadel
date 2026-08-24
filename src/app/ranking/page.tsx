@@ -87,26 +87,32 @@ export default async function RankingPage({
         </p>
       ) : (
         <div className="card-border overflow-hidden rounded-lg bg-surface-container">
+          {/* En mobile la tabla no entra: seis columnas contra 360px de pantalla.
+              Se desplaza de costado, y lo decimos en vez de dejar que el número
+              cortado en el borde sea la única pista. */}
+          <p className="font-label-caps text-label-caps flex items-center gap-1 border-b border-surface-bright px-3 py-2 text-on-surface-variant sm:hidden">
+            Deslizá la tabla para ver torneos, títulos y finales →
+          </p>
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] border-collapse text-left">
+            <table className="w-full min-w-[520px] border-collapse text-left">
               <thead>
                 <tr className="border-b border-surface-bright bg-surface-container-high">
-                  <th className="font-label-caps text-label-caps px-4 py-3 text-on-surface-variant">
+                  <th className="font-label-caps text-label-caps px-3 py-3 sm:px-4 text-on-surface-variant">
                     #
                   </th>
-                  <th className="font-label-caps text-label-caps px-4 py-3 text-on-surface-variant">
+                  <th className="font-label-caps text-label-caps px-3 py-3 sm:px-4 text-on-surface-variant">
                     Jugador
                   </th>
-                  <th className="font-label-caps text-label-caps px-4 py-3 text-right text-on-surface-variant">
+                  <th className="font-label-caps text-label-caps px-3 py-3 sm:px-4 text-right text-on-surface-variant">
                     Puntos
                   </th>
-                  <th className="font-label-caps text-label-caps px-4 py-3 text-right text-on-surface-variant">
+                  <th className="font-label-caps text-label-caps px-3 py-3 sm:px-4 text-right text-on-surface-variant">
                     Torneos
                   </th>
-                  <th className="font-label-caps text-label-caps px-4 py-3 text-right text-on-surface-variant">
+                  <th className="font-label-caps text-label-caps px-3 py-3 sm:px-4 text-right text-on-surface-variant">
                     Títulos
                   </th>
-                  <th className="font-label-caps text-label-caps px-4 py-3 text-right text-on-surface-variant">
+                  <th className="font-label-caps text-label-caps px-3 py-3 sm:px-4 text-right text-on-surface-variant">
                     Finales
                   </th>
                 </tr>
@@ -119,7 +125,7 @@ export default async function RankingPage({
                       key={row.player.id}
                       className="border-b border-surface-bright/50 last:border-0 hover:bg-surface-container-high"
                     >
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-3 sm:px-4">
                         <span
                           className={`font-headline-md text-headline-md ${
                             row.tier < MEDALS.length
@@ -130,23 +136,23 @@ export default async function RankingPage({
                           {medal ?? row.position}
                         </span>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-3 sm:px-4">
                         <span className="font-semibold text-on-surface">
                           {row.player.name}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-3 py-3 sm:px-4 text-right">
                         <span className="font-headline-md text-headline-md text-primary-fixed">
                           {row.points}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-right text-on-surface">
+                      <td className="px-3 py-3 sm:px-4 text-right text-on-surface">
                         {row.tournaments}
                       </td>
-                      <td className="px-4 py-3 text-right text-on-surface">
+                      <td className="px-3 py-3 sm:px-4 text-right text-on-surface">
                         {row.titles > 0 ? `🏆 ${row.titles}` : "—"}
                       </td>
-                      <td className="px-4 py-3 text-right text-on-surface">
+                      <td className="px-3 py-3 sm:px-4 text-right text-on-surface">
                         {row.finals > 0 ? row.finals : "—"}
                       </td>
                     </tr>

@@ -252,8 +252,8 @@ export default function AdminTournamentPanel({
   const plan = bracketPlan(Math.max(bracketPairCount, 2));
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-10">
-      <header className="flex items-center justify-between">
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-10">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <Link
             href="/admin"
@@ -265,7 +265,7 @@ export default function AdminTournamentPanel({
             {tournament.name}
           </h1>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <span className="rounded-full bg-surface-container-high px-3 py-1 text-xs font-medium text-on-surface-variant">
             {statusLabels[status]}
           </span>

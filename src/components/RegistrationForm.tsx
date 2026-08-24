@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Icon from "@/components/Icon";
 
 type Result = { name: string; alreadyRegistered: boolean };
 
@@ -53,9 +54,7 @@ export default function RegistrationForm({
   if (result) {
     return (
       <section className="card-border rounded-lg bg-surface-container p-space-md text-center">
-        <span className="material-symbols-outlined text-4xl text-primary-fixed">
-          check_circle
-        </span>
+        <Icon name="check_circle" className="text-4xl text-primary-fixed" />
         <p className="font-headline-md text-headline-md mt-2 text-on-surface">
           {result.alreadyRegistered
             ? `${result.name}, ya estabas anotado`

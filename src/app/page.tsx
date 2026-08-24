@@ -3,6 +3,7 @@ import Image from "next/image";
 import { prisma } from "@/lib/prisma";
 import { statusLabels, type TournamentStatus } from "@/lib/types";
 import TournamentHero from "@/components/TournamentHero";
+import Icon from "@/components/Icon";
 
 export const dynamic = "force-dynamic";
 
@@ -102,14 +103,16 @@ export default async function Home({
             </Link>
           ))}
         </div>
-        <form className="flex w-full items-center rounded border border-surface-bright bg-surface-dim p-1 transition-colors focus-within:border-primary-fixed md:w-auto">
-          <span className="material-symbols-outlined ml-2 text-on-surface-variant">
-            calendar_month
-          </span>
+        <form className="flex w-full min-w-0 items-center rounded border border-surface-bright bg-surface-dim p-1 transition-colors focus-within:border-primary-fixed md:w-auto">
+          <Icon
+            name="calendar_month"
+            className="ml-2 text-xl text-on-surface-variant"
+          />
           <input
-            className="font-body-md text-body-md ml-2 border-none bg-transparent text-on-surface focus:ring-0"
+            className="font-body-md text-body-md ml-2 w-full min-w-0 border-none bg-transparent text-on-surface focus:ring-0 md:w-auto"
             type="month"
             name="month"
+            aria-label="Filtrar por mes"
             defaultValue={month ?? ""}
           />
           {status && status !== "ALL" && (
@@ -151,18 +154,14 @@ export default async function Home({
                     {t.name}
                   </h2>
                   <div className="font-body-md text-body-md mb-2 flex items-center gap-2 text-on-surface-variant">
-                    <span className="material-symbols-outlined text-sm">
-                      group
-                    </span>
+                    <Icon name="group" className="text-lg" />
                     <span>{t._count.players} jugador(es)</span>
                   </div>
                   <div className="font-body-md text-body-md mb-space-md flex items-center gap-2 text-on-surface-variant">
-                    <span className="material-symbols-outlined text-sm">
-                      event
-                    </span>
+                    <Icon name="event" className="text-lg" />
                     <span>Creado el {formatDate(t.createdAt)}</span>
                   </div>
-                  <div className="mt-auto flex items-center justify-between border-t border-surface-bright pt-space-sm">
+                  <div className="mt-auto flex flex-wrap items-center justify-between gap-space-sm border-t border-surface-bright pt-space-sm">
                     <div className="flex flex-col">
                       <span className="font-label-caps text-label-caps text-on-surface-variant">
                         Inscripción por pareja
@@ -173,7 +172,7 @@ export default async function Home({
                     </div>
                     <Link
                       href={`/torneos/${t.id}`}
-                      className="font-label-caps text-label-caps rounded bg-primary-fixed px-6 py-3 font-bold uppercase tracking-wider text-on-primary-fixed transition-colors hover:bg-primary-fixed-dim"
+                      className="font-label-caps text-label-caps whitespace-nowrap rounded bg-primary-fixed px-6 py-3 font-bold uppercase tracking-wider text-on-primary-fixed transition-colors hover:bg-primary-fixed-dim"
                     >
                       Ver torneo
                     </Link>

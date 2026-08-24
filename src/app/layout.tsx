@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, Montserrat, JetBrains_Mono } from "next/font/google";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -26,18 +26,18 @@ export const metadata: Metadata = {
   description: "Torneos de pádel entre amigos: sorteo, cuadro y resultados",
 };
 
+// Next ya emite width=device-width por defecto; acá sólo pintamos la barra del
+// navegador del color del fondo para que no corte el diseño en mobile.
+export const viewport: Viewport = {
+  themeColor: "#081425",
+};
+
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="es"
       className={`${inter.variable} ${montserrat.variable} ${jetbrainsMono.variable} dark h-full antialiased`}
     >
-      <head>
-        <link
-          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
-          rel="stylesheet"
-        />
-      </head>
       <body className="flex min-h-full flex-col bg-background text-on-background">
         <Navbar />
         {children}
