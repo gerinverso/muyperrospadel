@@ -1,0 +1,31 @@
+{
+  "pages": [
+    { "id": "page-1", "name": "Landing" },
+    { "id": "page-2", "name": "Descartadas" }
+  ],
+  "artboards": [
+    { "file": "Main.dc.html", "x": 0, "y": 0, "w": 1440, "h": 2600, "title": "Landing · desktop 1440", "page": "page-1", "is_interactive": true },
+    { "file": "MobileB.dc.html", "x": 1600, "y": 0, "w": 390, "h": 3900, "title": "Landing · mobile 390", "page": "page-1", "is_interactive": true },
+    { "file": "DirectionA.dc.html", "x": 0, "y": 0, "w": 1440, "h": 3600, "title": "A · Editorial de club", "page": "page-2" },
+    { "file": "DirectionC.dc.html", "x": 1600, "y": 0, "w": 1440, "h": 3700, "title": "C · Nocturno mínimo", "page": "page-2" }
+  ],
+  "annotations": [
+    {
+      "id": "entrega",
+      "x": 0,
+      "y": -400,
+      "w": 1100,
+      "page": "page-1",
+      "text": "LANDING · dirección B (scoreboard)\nEl marcador manda: slab lime con la cuenta regresiva, grilla dura de líneas de 1px, ranking y torneos como tablas densas, cero glow y cero radios.\n\nFuncionan de verdad: los filtros de estado de la tabla de torneos y el selector de temporada del ranking (2026 / 2025).\nNombres, fechas, precios y puntos son de muestra — la estructura sigue el modelo real.\nEl chip de color de arriba del artboard cambia el lime de toda la página."
+    },
+    {
+      "id": "descartadas",
+      "x": 0,
+      "y": -320,
+      "w": 1100,
+      "page": "page-2",
+      "text": "Las dos direcciones que no seguimos, guardadas por si algo de acá sirve más adelante.\nA aportaba la jerarquía editorial (secciones numeradas, titular gigante); C el aire y las tarjetas con borde fino."
+    }
+  ],
+  "launch": { "view": "canvas", "page": "page-1" }
+}

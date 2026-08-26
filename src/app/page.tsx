@@ -1,47 +1,40 @@
-import Link from "next/link";
-import Image from "next/image";
 import { prisma } from "@/lib/prisma";
 import { statusLabels, type TournamentStatus } from "@/lib/types";
+import { formatFee, formatShortDate } from "@/lib/format";
+import { nextOpenTournament } from "@/lib/next-tournament";
+import { finishedSeasons, seasonRanking } from "@/lib/ranking-query";
 import TournamentHero from "@/components/TournamentHero";
-import Icon from "@/components/Icon";
+import HowItWorks from "@/components/HowItWorks";
+import RankingBoard from "@/components/RankingBoard";
+import TournamentsList, {
+  type TournamentRow,
+} from "@/components/TournamentsList";
+import JoinCta from "@/components/JoinCta";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Etiquetas cortas, distintas de `statusLabels`: en el control segmentado cinco
+ * etiquetas largas no entran ni en desktop. El nombre completo del estado sigue
+ * apareciendo en la fila de cada torneo.
+ */
 const STATUS_FILTERS: { value: TournamentStatus | "ALL"; label: string }[] = [
   { value: "ALL", label: "Todos" },
-  { value: "SETUP", label: statusLabels.SETUP },
-  { value: "PAIRS_DONE", label: statusLabels.PAIRS_DONE },
-  { value: "IN_PROGRESS", label: statusLabels.IN_PROGRESS },
-  { value: "FINISHED", label: statusLabels.FINISHED },
+  { value: "SETUP", label: "Cargando" },
+  { value: "PAIRS_DONE", label: "Parejas" },
+  { value: "IN_PROGRESS", label: "En juego" },
+  { value: "FINISHED", label: "Terminados" },
 ];
 
-const STATUS_BADGE_CLASSES: Record<TournamentStatus, string> = {
-  SETUP: "bg-surface-container-highest text-primary-fixed border-primary-fixed/30",
-  PAIRS_DONE: "bg-surface-container-highest text-secondary border-secondary/30",
-  GROUP_STAGE: "bg-surface-container-highest text-secondary border-secondary/30",
-  IN_PROGRESS: "bg-surface-container-highest text-tertiary-fixed border-tertiary-fixed/30",
-  FINISHED: "bg-surface-container-highest text-on-surface-variant border-outline-variant",
-};
-
-function formatDate(date: Date) {
-  return new Intl.DateTimeFormat("es-AR", {
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-  }).format(date);
-}
-
-function formatMoney(value: unknown) {
-  if (value === null || value === undefined) return null;
-  return `$${Number(value).toFixed(2)}`;
-}
+/** Cuántos jugadores del ranking se muestran en la home antes de "tabla completa". */
+const RANKING_ROWS = 8;
 
 export default async function Home({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; month?: string }>;
+  searchParams: Promise<{ status?: string; month?: string; temporada?: string }>;
 }) {
-  const { status, month } = await searchParams;
+  const { status, month, temporada } = await searchParams;
   const activeStatus = (status as TournamentStatus | undefined) ?? "ALL";
 
   let monthRange: { gte: Date; lt: Date } | null = null;
@@ -52,137 +45,108 @@ export default async function Home({
     monthRange = { gte: start, lt: end };
   }
 
-  const tournaments = await prisma.tournament.findMany({
-    orderBy: { createdAt: "desc" },
-    relationLoadStrategy: "join",
-    include: { _count: { select: { players: true } } },
-    where: {
-      ...(activeStatus !== "ALL" ? { status: activeStatus } : {}),
-      ...(monthRange ? { createdAt: monthRange } : {}),
-    },
-  });
+  const seasons = await finishedSeasons();
+  const parsedSeason = Number(temporada);
+  const season =
+    Number.isInteger(parsedSeason) && seasons.includes(parsedSeason)
+      ? parsedSeason
+      : seasons[0];
 
-  function filterHref(next: { status?: string; month?: string }) {
+  // El filtro de mes acota el universo entero ("N de M"); el de estado sólo la
+  // lista, para que el contador diga cuántos quedaron afuera del filtro.
+  const monthWhere = monthRange ? { createdAt: monthRange } : {};
+
+  const [nextTournament, ranking, tournaments, total] = await Promise.all([
+    nextOpenTournament(),
+    seasonRanking(season),
+    prisma.tournament.findMany({
+      orderBy: { createdAt: "desc" },
+      relationLoadStrategy: "join",
+      where: {
+        ...monthWhere,
+        ...(activeStatus !== "ALL" ? { status: activeStatus } : {}),
+      },
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        startsAt: true,
+        registrationFee: true,
+        _count: { select: { players: true } },
+      },
+    }),
+    prisma.tournament.count({ where: monthWhere }),
+  ]);
+
+  function hrefWith(next: {
+    status?: string;
+    month?: string;
+    temporada?: string;
+  }) {
     const params = new URLSearchParams();
     const nextStatus = next.status ?? status;
     const nextMonth = next.month ?? month;
+    const nextSeason = next.temporada ?? temporada;
     if (nextStatus && nextStatus !== "ALL") params.set("status", nextStatus);
     if (nextMonth) params.set("month", nextMonth);
+    if (nextSeason) params.set("temporada", nextSeason);
     const qs = params.toString();
     return qs ? `/?${qs}` : "/";
   }
 
+  const rows: TournamentRow[] = tournaments.map((t) => {
+    const tStatus = t.status as TournamentStatus;
+    return {
+      id: t.id,
+      name: t.name,
+      status: tStatus,
+      statusLabel: statusLabels[tStatus],
+      players: t._count.players,
+      when: t.startsAt ? formatShortDate(t.startsAt) : "Sin fecha",
+      fee: formatFee(t.registrationFee),
+    };
+  });
+
+  const hiddenFields = [
+    ...(activeStatus !== "ALL"
+      ? [{ name: "status", value: activeStatus }]
+      : []),
+    ...(temporada ? [{ name: "temporada", value: temporada }] : []),
+  ];
+
   return (
-    <main className="mx-auto w-full max-w-[1440px] flex-grow px-margin-mobile py-space-lg md:px-margin-desktop">
-      <TournamentHero />
+    <main className="mx-auto w-full max-w-[1440px] flex-grow">
+      {/* El título de la página existe para lectores de pantalla y buscadores:
+          en la pantalla el primer bloque es el anuncio del próximo torneo, que
+          dice mucho más que un encabezado genérico. */}
+      <h1 className="sr-only">
+        Muy Perros Pádel — torneos, ranking e inscripciones
+      </h1>
 
-      <header className="mb-space-lg flex flex-col items-start justify-between gap-space-md md:flex-row md:items-end">
-        <div>
-          <h1 className="font-headline-lg-mobile text-headline-lg-mobile uppercase tracking-tight text-primary-fixed md:font-headline-lg md:text-headline-lg">
-            Torneos Activos
-          </h1>
-          <p className="font-body-lg text-body-lg mt-2 max-w-2xl text-on-surface-variant">
-            MATIAS PAVONI JUGADOR REVELACION DEL CLUB
-          </p>
-        </div>
-      </header>
+      {nextTournament && <TournamentHero tournament={nextTournament} />}
 
-      <section className="card-border mb-space-lg flex flex-col items-center justify-between gap-space-sm rounded-lg bg-surface-container p-space-sm md:flex-row md:gap-space-md md:p-space-md">
-        <div className="flex w-full flex-wrap gap-space-sm md:w-auto">
-          {STATUS_FILTERS.map((f) => (
-            <Link
-              key={f.value}
-              href={filterHref({ status: f.value })}
-              className={`font-label-caps text-label-caps rounded-full border px-4 py-2 transition-colors ${
-                activeStatus === f.value
-                  ? "border-primary-fixed bg-primary-fixed/10 text-primary-fixed"
-                  : "border-surface-bright text-on-surface-variant hover:border-primary-fixed hover:text-primary-fixed"
-              }`}
-            >
-              {f.label}
-            </Link>
-          ))}
-        </div>
-        <form className="flex w-full min-w-0 items-center rounded border border-surface-bright bg-surface-dim p-1 transition-colors focus-within:border-primary-fixed md:w-auto">
-          <Icon
-            name="calendar_month"
-            className="ml-2 text-xl text-on-surface-variant"
-          />
-          <input
-            className="font-body-md text-body-md ml-2 w-full min-w-0 border-none bg-transparent text-on-surface focus:ring-0 md:w-auto"
-            type="month"
-            name="month"
-            aria-label="Filtrar por mes"
-            defaultValue={month ?? ""}
-          />
-          {status && status !== "ALL" && (
-            <input type="hidden" name="status" value={status} />
-          )}
-        </form>
-      </section>
+      <HowItWorks />
 
-      {tournaments.length === 0 ? (
-        <p className="card-border rounded-lg bg-surface-container p-6 text-center text-on-surface-variant">
-          No hay torneos que coincidan con este filtro.
-        </p>
-      ) : (
-        <div className="grid grid-cols-1 gap-space-md md:grid-cols-2 lg:grid-cols-3">
-          {tournaments.map((t) => {
-            const price = formatMoney(t.registrationFee);
-            const tStatus = t.status as TournamentStatus;
-            return (
-              <article
-                key={t.id}
-                className="card-border neon-glow-hover group flex flex-col overflow-hidden rounded-lg bg-surface-container transition-all duration-300"
-              >
-                <div className="relative flex h-40 w-full items-center justify-center bg-white p-2">
-                  <Image
-                    src="/logo.jpg"
-                    alt="Muy Perros Pádel"
-                    fill
-                    sizes="(max-width: 768px) 100vw, 33vw"
-                    className="object-contain p-2"
-                  />
-                  <div
-                    className={`font-label-caps text-label-caps absolute left-space-sm top-space-sm rounded border px-2 py-1 ${STATUS_BADGE_CLASSES[tStatus]}`}
-                  >
-                    {statusLabels[tStatus].toUpperCase()}
-                  </div>
-                </div>
-                <div className="flex flex-grow flex-col p-space-md">
-                  <h2 className="font-headline-md text-headline-md mb-space-xs text-on-surface transition-colors group-hover:text-primary-fixed">
-                    {t.name}
-                  </h2>
-                  <div className="font-body-md text-body-md mb-2 flex items-center gap-2 text-on-surface-variant">
-                    <Icon name="group" className="text-lg" />
-                    <span>{t._count.players} jugador(es)</span>
-                  </div>
-                  <div className="font-body-md text-body-md mb-space-md flex items-center gap-2 text-on-surface-variant">
-                    <Icon name="event" className="text-lg" />
-                    <span>Creado el {formatDate(t.createdAt)}</span>
-                  </div>
-                  <div className="mt-auto flex flex-wrap items-center justify-between gap-space-sm border-t border-surface-bright pt-space-sm">
-                    <div className="flex flex-col">
-                      <span className="font-label-caps text-label-caps text-on-surface-variant">
-                        Inscripción por pareja
-                      </span>
-                      <span className="font-headline-md text-headline-md text-primary-fixed">
-                        {price ?? "A definir"}
-                      </span>
-                    </div>
-                    <Link
-                      href={`/torneos/${t.id}`}
-                      className="font-label-caps text-label-caps whitespace-nowrap rounded bg-primary-fixed px-6 py-3 font-bold uppercase tracking-wider text-on-primary-fixed transition-colors hover:bg-primary-fixed-dim"
-                    >
-                      Ver torneo
-                    </Link>
-                  </div>
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      )}
+      <RankingBoard
+        rows={ranking.slice(0, RANKING_ROWS)}
+        season={season}
+        seasons={seasons}
+        hrefForSeason={(y) => hrefWith({ temporada: String(y) })}
+      />
+
+      <TournamentsList
+        rows={rows}
+        total={total}
+        activeStatus={activeStatus}
+        month={month}
+        hiddenFields={hiddenFields}
+        filters={STATUS_FILTERS.map((f) => ({
+          ...f,
+          href: hrefWith({ status: f.value }),
+        }))}
+      />
+
+      {nextTournament && <JoinCta tournament={nextTournament} />}
     </main>
   );
 }
