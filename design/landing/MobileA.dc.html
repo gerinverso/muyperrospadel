@@ -7,7 +7,7 @@
 <body>
 <x-dc>
 <helmet>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800;900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800;900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" />
   <style>
     * { box-sizing: border-box; }
     body { margin: 0; background: #081425; color: #d8e3fb; font-family: Inter, system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
@@ -26,7 +26,7 @@
 
   <nav style="display: flex; align-items: center; justify-content: space-between; gap: 12px; height: 64px; padding: 0 16px; border-bottom: 1px solid #444933;">
     <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
-      <img src="logo.jpg" alt="Muy Perros Padel" style="width: 38px; height: 38px; border-radius: 4px; object-fit: cover; flex-shrink: 0;">
+      <img src="logo.jpg" alt="Muy Perros Padel" style="width: 38px; height: 38px; border-radius: 4px; object-fit: cover; flex-shrink: 0;" />
       <span class="h20" style="font-size: 16px; font-weight: 900; letter-spacing: -0.05em; text-transform: uppercase; color: {{accent}};">Muy Perros Pádel</span>
     </div>
     <button type="button" aria-label="Abrir menú" style="display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; flex-shrink: 0; border: none; border-radius: 4px; background: #1f2a3c; cursor: pointer;">
@@ -36,13 +36,13 @@
 
   <section style="position: relative; overflow: hidden; padding: 32px 16px 36px;">
     <div style="position: absolute; top: -60px; right: -120px; width: 340px; height: 340px; pointer-events: none;">
-      <img src="logo.jpg" alt="" style="width: 100%; height: 100%; object-fit: contain; opacity: 0.22; -webkit-mask-image: radial-gradient(closest-side, #000 40%, transparent 86%); mask-image: radial-gradient(closest-side, #000 40%, transparent 86%);">
+      <img src="logo.jpg" alt="" style="width: 100%; height: 100%; object-fit: contain; opacity: 0.22; -webkit-mask-image: radial-gradient(closest-side, #000 40%, transparent 86%); mask-image: radial-gradient(closest-side, #000 40%, transparent 86%);" />
     </div>
     <div style="position: relative; display: flex; flex-direction: column; gap: 20px;">
       <span class="mono" style="color: {{accent}};">Próximo torneo</span>
       <span class="mono" style="display: inline-flex; align-items: center; align-self: flex-start; min-height: 32px; padding: 0 12px; border: 1px solid {{accent}}; background: {{accentSoft}}; color: {{accent}}; border-radius: 2px;">Faltan 9 días</span>
 
-      <h1 class="disp" style="font-size: 46px; line-height: 0.92; color: #d8e3fb;">Copa Muy<br>Perros <span style="color: {{accent}};">#7</span></h1>
+      <h1 class="disp" style="font-size: 46px; line-height: 0.92; color: #d8e3fb;">Copa Muy<br />Perros <span style="color: {{accent}};">#7</span></h1>
 
       <p class="body">Te anotás solo y el sorteo decide con quién jugás. Zonas primero, cuadro después.</p>
 
@@ -138,9 +138,8 @@
       <sc-for list="{{cards}}" as="t" hint-placeholder-count="6">
         <article style="display: flex; flex-direction: column; border: 1px solid #2f3a4c; border-radius: 4px; background: #152031; overflow: hidden;">
           <div style="position: relative; display: flex; align-items: center; justify-content: space-between; gap: 10px; height: 84px; padding: 16px; border-bottom: 1px solid #2f3a4c; background: #111c2d; overflow: hidden;">
-            <img src="logo.jpg" alt="" style="position: absolute; right: -26px; top: -34px; width: 150px; height: 150px; object-fit: contain; opacity: 0.2; -webkit-mask-image: radial-gradient(closest-side, #000 40%, transparent 84%); mask-image: radial-gradient(closest-side, #000 40%, transparent 84%);">
+            <img src="logo.jpg" alt="" style="position: absolute; right: -26px; top: -34px; width: 150px; height: 150px; object-fit: contain; opacity: 0.2; -webkit-mask-image: radial-gradient(closest-side, #000 40%, transparent 84%); mask-image: radial-gradient(closest-side, #000 40%, transparent 84%);" />
             <span class="mono" style="position: relative; display: inline-flex; align-items: center; min-height: 28px; padding: 0 10px; border-radius: 2px; border: 1px solid {{t.badgeBorder}}; background: {{t.badgeBg}}; color: {{t.badgeColor}};">{{t.estado}}</span>
-            <span class="disp" style="position: relative; font-size: 30px; line-height: 1; color: #2a3548;">{{t.tag}}</span>
           </div>
           <div style="display: flex; flex-direction: column; gap: 10px; padding: 18px 16px;">
             <h3 class="h20" style="color: #d8e3fb;">{{t.name}}</h3>
@@ -170,7 +169,7 @@
 
   <footer style="display: flex; flex-direction: column; gap: 20px; padding: 32px 16px; background: #040e1f; border-top: 1px solid #444933;">
     <div style="display: flex; align-items: center; gap: 10px;">
-      <img src="logo.jpg" alt="" style="width: 32px; height: 32px; border-radius: 4px; object-fit: cover;">
+      <img src="logo.jpg" alt="" style="width: 32px; height: 32px; border-radius: 4px; object-fit: cover;" />
       <span class="h20" style="font-size: 16px; font-weight: 900; letter-spacing: -0.05em; text-transform: uppercase; color: {{accent}};">Muy Perros Pádel</span>
     </div>
     <div style="display: flex; flex-wrap: wrap; gap: 18px;">
@@ -216,12 +215,12 @@ class Component extends DCLogic {
     ];
 
     const torneos = [
-      { tag: '#7', name: 'Copa Muy Perros #7', status: 'SETUP', estado: 'Cargando jugadores', players: '14 jugadores', date: 'Arranca 12 abr', fee: '$18.000' },
-      { tag: '#6', name: 'Nocturno de Marzo', status: 'SETUP', estado: 'Cargando jugadores', players: '9 jugadores', date: 'Sin fecha', fee: 'A definir' },
-      { tag: '#6', name: 'Copa Muy Perros #6', status: 'PAIRS_DONE', estado: 'Parejas definidas', players: '16 jugadores', date: 'Arranca 28 mar', fee: '$16.000' },
-      { tag: '#5', name: 'Clásico del Club', status: 'IN_PROGRESS', estado: 'Cuadro en juego', players: '24 jugadores', date: 'Cuartos de final', fee: '$20.000' },
-      { tag: '#4', name: 'Copa Muy Perros #5', status: 'FINISHED', estado: 'Finalizado', players: '20 jugadores', date: 'Terminó 15 feb', fee: '$15.000' },
-      { tag: '#3', name: 'Verano Muy Perros', status: 'FINISHED', estado: 'Finalizado', players: '12 jugadores', date: 'Terminó 18 ene', fee: '$12.000' }
+      { name: 'Copa Muy Perros #7', status: 'SETUP', estado: 'Cargando jugadores', players: '14 jugadores', date: 'Arranca 12 abr', fee: '$18.000' },
+      { name: 'Nocturno de Marzo', status: 'SETUP', estado: 'Cargando jugadores', players: '9 jugadores', date: 'Sin fecha', fee: 'A definir' },
+      { name: 'Copa Muy Perros #6', status: 'PAIRS_DONE', estado: 'Parejas definidas', players: '16 jugadores', date: 'Arranca 28 mar', fee: '$16.000' },
+      { name: 'Clásico del Club', status: 'IN_PROGRESS', estado: 'Cuadro en juego', players: '24 jugadores', date: 'Cuartos de final', fee: '$20.000' },
+      { name: 'Copa Muy Perros #5', status: 'FINISHED', estado: 'Finalizado', players: '20 jugadores', date: 'Terminó 15 feb', fee: '$15.000' },
+      { name: 'Verano Muy Perros', status: 'FINISHED', estado: 'Finalizado', players: '12 jugadores', date: 'Terminó 18 ene', fee: '$12.000' }
     ];
 
     const ranking = [
@@ -248,7 +247,6 @@ class Component extends DCLogic {
       cards: torneos
         .filter((t) => active === 'ALL' || t.status === active)
         .map((t) => ({
-          tag: t.tag,
           name: t.name,
           estado: t.estado,
           players: t.players,
