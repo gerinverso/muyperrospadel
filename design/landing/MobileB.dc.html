@@ -1,0 +1,336 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800;900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" />
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #081425; color: #d8e3fb; font-family: Inter, system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+    a { color: #c3f400; text-decoration: none; }
+    a:hover { color: #abd600; }
+    .mono { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12px; line-height: 1; letter-spacing: 0.1em; font-weight: 700; text-transform: uppercase; }
+    .mono14 { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 14px; line-height: 1.35; letter-spacing: 0.03em; font-weight: 400; }
+    .num { font-family: Montserrat, sans-serif; font-weight: 900; letter-spacing: -0.04em; margin: 0; font-variant-numeric: tabular-nums; }
+    .disp { font-family: Montserrat, sans-serif; font-weight: 900; letter-spacing: -0.035em; text-transform: uppercase; margin: 0; }
+    .h24 { font-family: Montserrat, sans-serif; font-weight: 800; font-size: 24px; line-height: 1.1; letter-spacing: -0.025em; text-transform: uppercase; margin: 0; }
+    .h18 { font-family: Montserrat, sans-serif; font-weight: 700; font-size: 18px; line-height: 1.25; margin: 0; }
+  </style>
+</helmet>
+
+<div style="width: 390px; background: #081425;">
+
+  <nav style="display: flex; align-items: center; justify-content: space-between; gap: 12px; height: 60px; padding: 0 16px; border-bottom: 1px solid #2f3a4c;">
+    <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
+      <span style="display: block; width: 5px; height: 26px; flex-shrink: 0; background: {{accent}};"></span>
+      <img src="logo.jpg" alt="Muy Perros Padel" style="width: 32px; height: 32px; flex-shrink: 0; object-fit: cover;" />
+      <span class="disp" style="font-size: 15px; letter-spacing: -0.04em; color: #d8e3fb;">Muy Perros Pádel</span>
+    </div>
+    <button type="button" aria-label="Abrir menú" style="display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; flex-shrink: 0; border: 1px solid #2f3a4c; background: transparent; cursor: pointer;">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="{{accent}}" aria-hidden="true"><path d="M3 6h18v2H3V6Zm0 5h18v2H3v-2Zm0 5h18v2H3v-2Z"></path></svg>
+    </button>
+  </nav>
+
+  <div style="display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid #2f3a4c; background: #111c2d;">
+    <span style="display: block; width: 8px; height: 8px; flex-shrink: 0; background: {{accent}};"></span>
+    <span class="mono" style="color: {{accent}};">Inscripción abierta</span>
+    <span class="mono" style="color: #8e9379;">· 7ª ed.</span>
+  </div>
+
+  <section style="padding: 26px 16px 24px;">
+    <h1 class="disp" style="font-size: 44px; line-height: 0.88; color: #d8e3fb;">Copa Muy<br />Perros 07</h1>
+  </section>
+
+  <section style="display: flex; flex-direction: column; gap: 22px; padding: 22px 16px 24px; background: {{accent}};">
+    <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 12px;">
+      <div>
+        <p class="mono" style="margin: 0 0 10px; color: #3c4d00;">Cierra en</p>
+        <p class="num" style="font-size: 104px; line-height: 0.78; color: #161e00;">09</p>
+      </div>
+      <div style="text-align: right;">
+        <p class="disp" style="font-size: 26px; line-height: 1; color: #161e00;">días</p>
+        <p class="mono" style="margin: 10px 0 0; color: #3c4d00;">10 abr · 23:59</p>
+      </div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+      <a href="#" class="mono" style="display: flex; align-items: center; justify-content: center; min-height: 56px; background: #081425; color: {{accent}};">Inscribirme</a>
+      <a href="#" class="mono" style="display: flex; align-items: center; justify-content: center; min-height: 56px; border: 1px solid #161e00; color: #161e00;">Ver el cuadro</a>
+    </div>
+  </section>
+
+  <section>
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-bottom: 1px solid #2f3a4c;">
+      <div style="padding: 18px 16px; border-right: 1px solid #2f3a4c;">
+        <p class="mono" style="margin: 0 0 12px; color: #8e9379;">Arranca</p>
+        <p class="num" style="font-size: 24px; color: #d8e3fb;">12 ABR</p>
+        <p class="mono14" style="margin: 8px 0 0; color: #8e9379;">sábado, 20:00</p>
+      </div>
+      <div style="padding: 18px 16px;">
+        <p class="mono" style="margin: 0 0 12px; color: #8e9379;">Por pareja</p>
+        <p class="num" style="font-size: 24px; color: #d8e3fb;">$18.000</p>
+        <p class="mono14" style="margin: 8px 0 0; color: #8e9379;">cancha incluida</p>
+      </div>
+    </div>
+    <div style="padding: 18px 16px; border-bottom: 1px solid #2f3a4c;">
+      <p class="mono" style="margin: 0 0 12px; color: #8e9379;">Anotados</p>
+      <p class="num" style="font-size: 24px; color: #d8e3fb;">14 <span class="mono14" style="color: #8e9379;">/ 16 · quedan 2 lugares</span></p>
+      <div style="display: flex; gap: 3px; margin-top: 14px;">
+        <sc-for list="{{slots}}" as="s" hint-placeholder-count="16">
+          <span style="display: block; width: 18px; height: 16px; background: {{s.bg}}; border: 1px solid {{s.border}};"></span>
+        </sc-for>
+      </div>
+    </div>
+  </section>
+
+  <section style="background: #040e1f; border-bottom: 1px solid #2f3a4c;">
+    <div style="display: flex; flex-direction: column; gap: 8px; padding: 20px 16px; border-bottom: 1px solid #1f2a3c;">
+      <span class="mono" style="color: {{accent}};">01 · Te anotás</span>
+      <p class="mono14" style="margin: 0; color: #c4c9ac;">Nombre y DNI en el formulario. Sin cuenta.</p>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 8px; padding: 20px 16px; border-bottom: 1px solid #1f2a3c;">
+      <span class="mono" style="color: {{accent}};">02 · Sorteo</span>
+      <p class="mono14" style="margin: 0; color: #c4c9ac;">Las parejas salen al azar delante de todos.</p>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 8px; padding: 20px 16px; border-bottom: 1px solid #1f2a3c;">
+      <span class="mono" style="color: {{accent}};">03 · Zonas y cuadro</span>
+      <p class="mono14" style="margin: 0; color: #c4c9ac;">Fase de grupos y después eliminación directa.</p>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 8px; padding: 20px 16px;">
+      <span class="mono" style="color: {{accent}};">04 · Puntos</span>
+      <p class="mono14" style="margin: 0; color: #c4c9ac;">Campeón, finalista y semis suman al ranking.</p>
+    </div>
+  </section>
+
+  <section style="padding: 28px 16px 32px;">
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px;">
+      <h2 class="h24" style="color: #d8e3fb;">Ranking</h2>
+      <div style="display: flex; border: 1px solid #2f3a4c;">
+        <sc-for list="{{seasons}}" as="s" hint-placeholder-count="2">
+          <button type="button" onClick="{{ s.pick }}" class="mono" style="display: inline-flex; align-items: center; min-height: 36px; padding: 0 14px; cursor: pointer; border: none; border-right: {{s.br}}; background: {{s.bg}}; color: {{s.color}};">{{s.label}}</button>
+        </sc-for>
+      </div>
+    </div>
+
+    <div style="border: 1px solid #2f3a4c;">
+      <p class="mono" style="margin: 0; padding: 12px 14px; border-bottom: 1px solid #2f3a4c; color: #8e9379;">Deslizá la tabla para ver títulos y finales →</p>
+      <div style="overflow-x: auto;">
+        <div style="min-width: 520px;">
+          <div style="display: grid; grid-template-columns: 66px minmax(0, 1fr) 74px 74px 74px 96px; background: #1f2a3c; border-bottom: 1px solid #2f3a4c;">
+            <span class="mono" style="padding: 14px 12px; color: #8e9379;">Pos</span>
+            <span class="mono" style="padding: 14px 12px; color: #8e9379;">Jugador</span>
+            <span class="mono" style="padding: 14px 12px; text-align: right; color: #8e9379;">Torn.</span>
+            <span class="mono" style="padding: 14px 12px; text-align: right; color: #8e9379;">Tít.</span>
+            <span class="mono" style="padding: 14px 12px; text-align: right; color: #8e9379;">Fin.</span>
+            <span class="mono" style="padding: 14px 12px; text-align: right; color: #8e9379;">Puntos</span>
+          </div>
+          <sc-for list="{{ranking}}" as="r" hint-placeholder-count="8">
+            <div style="display: grid; grid-template-columns: 66px minmax(0, 1fr) 74px 74px 74px 96px; align-items: center; border-bottom: 1px solid #1f2a3c; background: {{r.rowBg}};">
+              <span style="padding: 10px 12px;">
+                <span class="num" style="display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; font-size: 16px; background: {{r.rankBg}}; border: 1px solid {{r.rankBorder}}; color: {{r.rankColor}};">{{r.pos}}</span>
+              </span>
+              <span class="h18" style="padding: 12px; color: #d8e3fb;">{{r.name}}</span>
+              <span class="mono14" style="padding: 12px; text-align: right; color: #c4c9ac;">{{r.torneos}}</span>
+              <span class="mono14" style="padding: 12px; text-align: right; color: {{r.titulosColor}};">{{r.titulos}}</span>
+              <span class="mono14" style="padding: 12px; text-align: right; color: #c4c9ac;">{{r.finales}}</span>
+              <span class="num" style="padding: 12px; font-size: 18px; text-align: right; color: {{r.pointsColor}};">{{r.points}}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+    <p class="mono" style="margin: 14px 0 0; color: #8e9379;">Datos de muestra · el botón de temporada funciona</p>
+  </section>
+
+  <section style="padding: 0 16px 32px;">
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px;">
+      <h2 class="h24" style="color: #d8e3fb;">Torneos</h2>
+      <span class="mono" style="color: #8e9379;">{{count}}</span>
+    </div>
+
+    <div style="overflow-x: auto; margin-bottom: 20px;">
+      <div style="display: flex; width: fit-content; border: 1px solid #2f3a4c;">
+        <sc-for list="{{filters}}" as="f" hint-placeholder-count="5">
+          <button type="button" onClick="{{ f.pick }}" class="mono" style="display: inline-flex; align-items: center; min-height: 46px; padding: 0 18px; white-space: nowrap; cursor: pointer; border: none; border-right: {{f.br}}; background: {{f.bg}}; color: {{f.color}};">{{f.label}}</button>
+        </sc-for>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 12px;">
+      <sc-for list="{{rows}}" as="t" hint-placeholder-count="6">
+        <article style="border: 1px solid #2f3a4c;">
+          <div style="display: flex; flex-direction: column; gap: 12px; padding: 16px; border-bottom: 1px solid #1f2a3c;">
+            <span class="mono" style="display: inline-flex; align-self: flex-start; align-items: center; min-height: 26px; padding: 0 10px; border: 1px solid {{t.badgeBorder}}; color: {{t.badgeColor}};">{{t.estado}}</span>
+            <h3 class="h18" style="font-size: 20px; color: #d8e3fb;">{{t.name}}</h3>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));">
+            <div style="padding: 12px 14px; border-right: 1px solid #1f2a3c;">
+              <p class="mono" style="margin: 0 0 8px; color: #8e9379;">Jug.</p>
+              <p class="num" style="font-size: 18px; color: #d8e3fb;">{{t.players}}</p>
+            </div>
+            <div style="padding: 12px 14px; border-right: 1px solid #1f2a3c;">
+              <p class="mono" style="margin: 0 0 8px; color: #8e9379;">Arranca</p>
+              <p class="mono14" style="margin: 0; color: #c4c9ac;">{{t.date}}</p>
+            </div>
+            <div style="padding: 12px 14px;">
+              <p class="mono" style="margin: 0 0 8px; color: #8e9379;">Pareja</p>
+              <p class="num" style="font-size: 18px; color: {{t.feeColor}};">{{t.fee}}</p>
+            </div>
+          </div>
+          <a href="#" class="mono" style="display: flex; align-items: center; justify-content: center; min-height: 48px; border-top: 1px solid #1f2a3c; color: {{accent}};">Ver torneo →</a>
+        </article>
+      </sc-for>
+    </div>
+    <p class="mono" style="margin: 16px 0 0; color: #8e9379;">Datos de muestra · los filtros funcionan</p>
+  </section>
+
+  <section style="display: flex; flex-direction: column; gap: 20px; padding: 36px 16px; border-top: 2px solid {{accent}}; background: #040e1f;">
+    <p class="mono" style="margin: 0; color: {{accent}};">Quedan 2 lugares</p>
+    <h2 class="disp" style="font-size: 38px; line-height: 0.94; color: #d8e3fb;">Anotate en la<br />Copa 07</h2>
+    <a href="#" class="mono" style="display: flex; align-items: center; justify-content: center; min-height: 60px; background: {{accent}}; color: #161e00;">Inscribirme</a>
+    <span class="mono" style="color: #8e9379;">Cierra el 10 de abril</span>
+  </section>
+
+  <footer style="display: flex; flex-direction: column; gap: 18px; padding: 26px 16px; border-top: 1px solid #2f3a4c;">
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <span style="display: block; width: 4px; height: 18px; background: {{accent}};"></span>
+      <span class="disp" style="font-size: 15px; letter-spacing: -0.04em; color: #d8e3fb;">Muy Perros Pádel</span>
+    </div>
+    <div style="display: flex; flex-wrap: wrap; gap: 18px;">
+      <a href="#" class="mono" style="color: #8e9379;">Torneos</a>
+      <a href="#" class="mono" style="color: #8e9379;">Ranking</a>
+      <a href="#" class="mono" style="color: #8e9379;">Panel Admin</a>
+    </div>
+    <span class="mono" style="color: #8e9379;">© 2026 — German Dev</span>
+  </footer>
+
+</div>
+</x-dc>
+
+<script data-dc-script data-props='{"accent":{"editor":"color","default":"#c3f400","options":["#c3f400","#abd600","#a3e635","#facc15"],"section":"Marca"},"$preview":{"width":390,"height":3900}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { filter: 'ALL', season: '2026' };
+  }
+
+  renderVals() {
+    const accent = this.props.accent ?? '#c3f400';
+    const soft = (hex, a) => {
+      const h = hex.replace('#', '');
+      const full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h;
+      const n = parseInt(full, 16);
+      return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')';
+    };
+
+    const statusColor = {
+      SETUP: accent,
+      PAIRS_DONE: '#bec6e0',
+      IN_PROGRESS: '#e0e3e5',
+      FINISHED: '#c4c9ac'
+    };
+
+    const filterDefs = [
+      { key: 'ALL', label: 'Todos' },
+      { key: 'SETUP', label: 'Cargando' },
+      { key: 'PAIRS_DONE', label: 'Parejas' },
+      { key: 'IN_PROGRESS', label: 'En juego' },
+      { key: 'FINISHED', label: 'Terminados' }
+    ];
+
+    const torneos = [
+      { name: 'Copa Muy Perros 07', status: 'SETUP', estado: 'Cargando jugadores', players: '14', date: '12 abr', fee: '$18.000' },
+      { name: 'Nocturno de Marzo', status: 'SETUP', estado: 'Cargando jugadores', players: '9', date: 'sin fecha', fee: 'a definir' },
+      { name: 'Copa Muy Perros 06', status: 'PAIRS_DONE', estado: 'Parejas definidas', players: '16', date: '28 mar', fee: '$16.000' },
+      { name: 'Clásico del Club', status: 'IN_PROGRESS', estado: 'Cuadro en juego', players: '24', date: 'cuartos', fee: '$20.000' },
+      { name: 'Copa Muy Perros 05', status: 'FINISHED', estado: 'Finalizado', players: '20', date: '15 feb', fee: '$15.000' },
+      { name: 'Verano Muy Perros', status: 'FINISHED', estado: 'Finalizado', players: '12', date: '18 ene', fee: '$12.000' }
+    ];
+
+    const rankingBySeason = {
+      '2026': [
+        { pos: '1', name: 'L. Gómez', torneos: '4', titulos: '2', finales: '3', points: '340' },
+        { pos: '2', name: 'F. Ríos', torneos: '4', titulos: '1', finales: '2', points: '285' },
+        { pos: '3', name: 'M. Sosa', torneos: '3', titulos: '1', finales: '1', points: '210' },
+        { pos: '4', name: 'D. Ferrer', torneos: '4', titulos: '0', finales: '2', points: '175' },
+        { pos: '5', name: 'J. Ledesma', torneos: '3', titulos: '0', finales: '1', points: '140' },
+        { pos: '6', name: 'A. Britez', torneos: '3', titulos: '0', finales: '1', points: '120' },
+        { pos: '7', name: 'R. Ojeda', torneos: '2', titulos: '0', finales: '0', points: '85' },
+        { pos: '8', name: 'S. Vera', torneos: '2', titulos: '0', finales: '0', points: '70' }
+      ],
+      '2025': [
+        { pos: '1', name: 'D. Ferrer', torneos: '6', titulos: '3', finales: '4', points: '520' },
+        { pos: '2', name: 'L. Gómez', torneos: '6', titulos: '2', finales: '3', points: '465' },
+        { pos: '3', name: 'S. Vera', torneos: '5', titulos: '1', finales: '2', points: '330' },
+        { pos: '4', name: 'M. Sosa', torneos: '6', titulos: '0', finales: '2', points: '295' },
+        { pos: '5', name: 'F. Ríos', torneos: '4', titulos: '0', finales: '1', points: '215' },
+        { pos: '6', name: 'R. Ojeda', torneos: '5', titulos: '0', finales: '1', points: '190' },
+        { pos: '7', name: 'A. Britez', torneos: '3', titulos: '0', finales: '0', points: '110' },
+        { pos: '8', name: 'J. Ledesma', torneos: '2', titulos: '0', finales: '0', points: '65' }
+      ]
+    };
+
+    const active = this.state.filter;
+    const season = this.state.season;
+    const rows = torneos.filter((t) => active === 'ALL' || t.status === active);
+
+    const taken = 14;
+    const slots = [];
+    for (let i = 0; i < 16; i += 1) {
+      slots.push({
+        bg: i < taken ? accent : 'transparent',
+        border: i < taken ? accent : '#2f3a4c'
+      });
+    }
+
+    return {
+      accent,
+      slots,
+      count: rows.length + ' de ' + torneos.length,
+      seasons: ['2026', '2025'].map((y, i, arr) => ({
+        label: y,
+        pick: () => this.setState({ season: y }),
+        bg: y === season ? accent : 'transparent',
+        color: y === season ? '#161e00' : '#8e9379',
+        br: i === arr.length - 1 ? 'none' : '1px solid #2f3a4c'
+      })),
+      filters: filterDefs.map((f, i, arr) => ({
+        label: f.label,
+        pick: () => this.setState({ filter: f.key }),
+        bg: f.key === active ? accent : 'transparent',
+        color: f.key === active ? '#161e00' : '#c4c9ac',
+        br: i === arr.length - 1 ? 'none' : '1px solid #2f3a4c'
+      })),
+      rows: rows.map((t) => ({
+        name: t.name,
+        estado: t.estado,
+        players: t.players,
+        date: t.date,
+        fee: t.fee,
+        feeColor: t.status === 'FINISHED' ? '#8e9379' : accent,
+        badgeColor: statusColor[t.status],
+        badgeBorder: soft(statusColor[t.status], 0.45)
+      })),
+      ranking: rankingBySeason[season].map((r, i) => ({
+        pos: r.pos,
+        name: r.name,
+        torneos: r.torneos,
+        titulos: r.titulos,
+        finales: r.finales,
+        points: r.points,
+        titulosColor: r.titulos === '0' ? '#8e9379' : accent,
+        pointsColor: i === 0 ? accent : '#d8e3fb',
+        rankBg: i === 0 ? accent : 'transparent',
+        rankBorder: i < 3 ? accent : 'transparent',
+        rankColor: i === 0 ? '#161e00' : (i < 3 ? accent : '#8e9379'),
+        rowBg: i % 2 === 0 ? '#111c2d' : 'transparent'
+      }))
+    };
+  }
+}
+</script>
+</body>
+</html>
