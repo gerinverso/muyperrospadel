@@ -1,0 +1,39 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html", "x": 0, "y": 0, "w": 1440, "h": 3600, "title": "A · Editorial de club (recomendada)" },
+    { "file": "DirectionB.dc.html", "x": 1600, "y": 0, "w": 1440, "h": 2500, "title": "B · Scoreboard" },
+    { "file": "DirectionC.dc.html", "x": 3200, "y": 0, "w": 1440, "h": 3700, "title": "C · Nocturno mínimo" },
+    { "file": "MobileA.dc.html", "x": 4800, "y": 0, "w": 390, "h": 4600, "title": "A en mobile · 390px" }
+  ],
+  "annotations": [
+    {
+      "id": "dir-a",
+      "x": 0,
+      "y": -380,
+      "w": 1000,
+      "text": "A · EDITORIAL DE CLUB — mi recomendación\nEje: identidad y jerarquía. Titular de 116px, secciones numeradas 01/02/03 con reglas finas, lime sólo como acento y una única banda lime maciza al cierre.\nA favor: se siente un club con historia, el próximo torneo manda y hay aire para leer.\nEn contra: es la más alta de las tres — hay que scrollear para llegar a la grilla de torneos."
+    },
+    {
+      "id": "dir-b",
+      "x": 1600,
+      "y": -380,
+      "w": 1000,
+      "text": "B · SCOREBOARD\nEje: los números al frente. Slab lime con la cuenta regresiva, grilla dura de líneas de 1px, ranking y torneos como tablas densas, cero glow y cero radios.\nA favor: muestra mucho más por pantalla y se parece a lo que la app realmente hace.\nEn contra: se lee más herramienta que invitación, y el bloque lime grande puede cansar."
+    },
+    {
+      "id": "dir-c",
+      "x": 3200,
+      "y": -380,
+      "w": 1000,
+      "text": "C · NOCTURNO MÍNIMO\nEje: calma y producto. Fondo casi negro (#040e1f), tarjetas con borde de 1px y radio 8, títulos en caja baja en vez de todo mayúsculas, un único lime por pantalla. También reemplaza el gris oliva #c4c9ac por un gris frío.\nA favor: es la que se ve más moderna y prolija de las tres.\nEn contra: pierde el carácter de club de barrio; puede quedar genérica."
+    },
+    {
+      "id": "mobile-a",
+      "x": 4800,
+      "y": -380,
+      "w": 520,
+      "text": "A en 390px\nMismo esqueleto: titular 46px, meta en 2×2, tarjetas de a una, botones a todo el ancho.\nSin barra de estado ni teclado falsos: ese espacio lo pinta el teléfono."
+    }
+  ],
+  "launch": { "view": "canvas" }
+}
