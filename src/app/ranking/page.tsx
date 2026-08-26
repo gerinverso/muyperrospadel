@@ -1,14 +1,6 @@
 import Link from "next/link";
-import { prisma } from "@/lib/prisma";
-import {
-  computeRanking,
-  seasonOf,
-  seasonRange,
-  RANKING_POINTS,
-  STAGE_LABELS,
-  STAGE_ORDER,
-  type RankingTournament,
-} from "@/lib/ranking";
+import { RANKING_POINTS, STAGE_LABELS, STAGE_ORDER } from "@/lib/ranking";
+import { finishedSeasons, seasonRanking } from "@/lib/ranking-query";
 
 export const dynamic = "force-dynamic";
 
@@ -22,32 +14,13 @@ export default async function RankingPage({
   const { temporada } = await searchParams;
 
   // Temporadas con al menos un torneo terminado, para armar el selector.
-  const finished = await prisma.tournament.findMany({
-    where: { status: "FINISHED" },
-    select: { createdAt: true },
-    orderBy: { createdAt: "desc" },
-  });
-
-  const currentYear = seasonOf(new Date());
-  const seasons = [
-    ...new Set([currentYear, ...finished.map((t) => seasonOf(t.createdAt))]),
-  ].sort((a, b) => b - a);
+  const seasons = await finishedSeasons();
 
   const parsed = Number(temporada);
   const season =
     Number.isInteger(parsed) && seasons.includes(parsed) ? parsed : seasons[0];
 
-  const tournaments = await prisma.tournament.findMany({
-    where: { status: "FINISHED", createdAt: seasonRange(season) },
-    relationLoadStrategy: "join",
-    include: {
-      pairs: { include: { player1: true, player2: true } },
-      groups: { include: { pairs: { select: { id: true } }, matches: true } },
-      matches: true,
-    },
-  });
-
-  const ranking = computeRanking(tournaments as unknown as RankingTournament[]);
+  const ranking = await seasonRanking(season);
 
   return (
     <main className="mx-auto w-full max-w-[1440px] flex-grow px-margin-mobile py-space-lg md:px-margin-desktop">

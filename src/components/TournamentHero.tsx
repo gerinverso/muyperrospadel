@@ -1,138 +1,114 @@
 import Link from "next/link";
-import Image from "next/image";
-import { prisma } from "@/lib/prisma";
-import { countdownLabel } from "@/lib/countdown";
-
-function formatStartDate(date: Date) {
-  return new Intl.DateTimeFormat("es-AR", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    timeZone: "America/Argentina/Buenos_Aires",
-  }).format(date);
-}
+import { daysUntil } from "@/lib/countdown";
+import { formatLongDate } from "@/lib/format";
+import type { NextTournament } from "@/lib/next-tournament";
 
 /**
- * Hero de la home: anuncia el proximo torneo con inscripciones abiertas.
+ * Anuncio del proximo torneo con inscripcion abierta, con forma de marcador: a
+ * la izquierda el nombre y los datos duros, a la derecha el bloque lima con la
+ * cuenta regresiva y la accion principal.
  *
- * Se elige el que arranca antes. Los que todavia no tienen fecha van ultimos y
- * se anuncian sin cuenta regresiva: la fecha es opcional y no tiene por que
- * esconder el anuncio.
- *
- * Si no hay ninguno devuelve null y la home queda como estaba.
+ * El torneo llega por props (lo busca la home con `nextOpenTournament`) porque
+ * el cierre de la pagina repite la misma accion y seria una segunda consulta
+ * por la misma fila.
  */
-export default async function TournamentHero() {
-  const tournament = await prisma.tournament.findFirst({
-    where: { registrationOpen: true, status: "SETUP" },
-    orderBy: { startsAt: { sort: "asc", nulls: "last" } },
-    select: {
-      id: true,
-      name: true,
-      startsAt: true,
-      registrationFee: true,
-      _count: { select: { players: true } },
-    },
-  });
-
-  if (!tournament) return null;
-
-  const countdown = countdownLabel(tournament.startsAt, new Date());
-  const players = tournament._count.players;
-  const fee = tournament.registrationFee
-    ? `$${Number(tournament.registrationFee).toFixed(0)}`
-    : null;
+export default function TournamentHero({
+  tournament,
+}: {
+  tournament: NextTournament;
+}) {
+  const { players, fee, startsAt } = tournament;
+  const days = startsAt ? daysUntil(startsAt, new Date()) : null;
+  // Un torneo que ya arrancó puede seguir con la inscripción abierta: ahí el
+  // bloque lima deja de contar días y sólo dice que sigue abierta.
+  const counting = days !== null && days >= 0;
 
   return (
-    <section className="neon-glow relative isolate mb-space-lg overflow-hidden rounded-lg border border-primary-fixed/40 bg-surface-container">
-      {/* El logo del club como escudo del anuncio: entero y reconocible, no un
-          recorte al azar. El jpg tiene fondo claro solido, asi que sin mascara
-          se veria como un rectangulo gris pegado encima; el degradado radial lo
-          disuelve por los cuatro lados y lo deja flotando. */}
-      <div
-        className="pointer-events-none absolute inset-y-0 right-0 flex w-full items-center justify-center md:w-1/2 md:justify-end"
-        aria-hidden="true"
-      >
-        {/* Ampliado a proposito: recorta el texto del logo y deja en cuadro solo
-            la ilustracion, que es lo reconocible y no compite con la tipografia. */}
-        <div className="relative aspect-square h-[185%]">
-          <Image
-            src="/logo.jpg"
-            alt=""
-            fill
-            sizes="(max-width: 768px) 100vw, 50vw"
-            priority
-            className="object-contain opacity-[0.10] [-webkit-mask-image:radial-gradient(closest-side,#000_45%,transparent_92%)] [mask-image:radial-gradient(closest-side,#000_45%,transparent_92%)] md:opacity-40"
-          />
-        </div>
-      </div>
-
-      {/* Velo que asegura la lectura del texto: vertical en mobile (el logo
-          queda detras) y horizontal en desktop (queda al lado). */}
-      <div
-        className="absolute inset-0 bg-gradient-to-b from-surface-container via-surface-container/85 to-surface-container/50 md:bg-gradient-to-r md:via-surface-container/80 md:to-transparent"
-        aria-hidden="true"
-      />
-
-      <div className="relative flex flex-col gap-space-md p-space-md md:max-w-[70%] md:p-space-lg">
-        <div className="flex flex-wrap items-center gap-space-sm">
-          <p className="font-label-caps text-label-caps text-primary-fixed">
-            NUEVO TORNEO · INSCRIPCIÓN ABIERTA
-          </p>
-          {countdown && (
-            <span className="font-label-caps text-label-caps rounded border border-primary-fixed bg-primary-fixed/10 px-3 py-2 uppercase text-primary-fixed">
-              {countdown}
-            </span>
-          )}
+    <section className="grid grid-cols-1 border-b border-surface-bright lg:grid-cols-[minmax(0,1fr)_400px]">
+      <div className="court-lines flex flex-col border-b border-surface-bright lg:border-b-0 lg:border-r">
+        <div className="flex flex-wrap items-center gap-space-xs border-b border-surface-bright bg-surface-container-low px-margin-mobile py-space-sm md:px-margin-desktop">
+          <span aria-hidden="true" className="h-2 w-2 bg-primary-fixed" />
+          <span className="font-label-caps text-label-caps text-primary-fixed">
+            Inscripción abierta
+          </span>
+          <span className="font-label-caps text-label-caps text-outline">
+            · el sorteo arma las parejas
+          </span>
         </div>
 
-        {/* h2 y no h1: el h1 de la portada es "Torneos activos", que es de lo
-            que trata la pagina. Este anuncio es una seccion destacada adentro,
-            por mas que visualmente sea lo primero y lo mas grande. */}
-        <h2 className="font-headline-lg-mobile text-headline-lg-mobile uppercase tracking-tight text-on-surface md:font-display-lg md:text-display-lg">
+        {/* h2 y no h1: el h1 de la portada es el título de la página. Este
+            anuncio es una sección destacada adentro, por más que visualmente
+            sea lo primero y lo más grande. */}
+        <h2 className="font-headline-lg-mobile text-headline-lg-mobile px-margin-mobile py-space-md uppercase leading-[0.9] tracking-tight text-on-surface md:px-margin-desktop md:py-space-lg md:font-display-lg md:text-display-lg">
           {tournament.name}
         </h2>
 
-        <dl className="flex flex-wrap gap-x-space-lg gap-y-space-sm border-t border-outline-variant pt-space-sm">
-          {tournament.startsAt && (
-            <div>
-              <dt className="font-label-caps text-label-caps text-on-surface-variant">
-                ARRANCA
-              </dt>
-              <dd className="font-headline-md text-headline-md mt-1 first-letter:uppercase text-on-surface">
-                {formatStartDate(tournament.startsAt)}
-              </dd>
-            </div>
-          )}
-          <div>
-            <dt className="font-label-caps text-label-caps text-on-surface-variant">
-              ANOTADOS
+        <dl className="mt-auto grid grid-cols-1 gap-px border-t border-surface-bright bg-surface-bright sm:grid-cols-3">
+          <div className="bg-background px-margin-mobile py-space-sm md:px-margin-desktop">
+            <dt className="font-label-caps text-label-caps text-outline">
+              Arranca
             </dt>
-            <dd className="font-headline-md text-headline-md mt-1 text-on-surface">
-              {players}
+            <dd className="font-headline-md text-headline-md mt-3 text-on-surface first-letter:uppercase">
+              {startsAt ? formatLongDate(startsAt) : "A definir"}
             </dd>
           </div>
-          {fee && (
-            <div>
-              <dt className="font-label-caps text-label-caps text-on-surface-variant">
-                INSCRIPCIÓN
-              </dt>
-              <dd className="font-headline-md text-headline-md mt-1 text-on-surface">
-                {fee}
-              </dd>
-            </div>
-          )}
+          <div className="bg-background px-margin-mobile py-space-sm md:px-space-md">
+            <dt className="font-label-caps text-label-caps text-outline">
+              Anotados
+            </dt>
+            <dd className="font-headline-md text-headline-md mt-3 tabular-nums text-on-surface">
+              {players} {players === 1 ? "jugador" : "jugadores"}
+            </dd>
+          </div>
+          <div className="bg-background px-margin-mobile py-space-sm md:px-space-md">
+            <dt className="font-label-caps text-label-caps text-outline">
+              Por jugador
+            </dt>
+            <dd className="font-headline-md text-headline-md mt-3 tabular-nums text-on-surface">
+              {fee ?? "A definir"}
+            </dd>
+          </div>
         </dl>
+      </div>
 
-        <div className="flex flex-col gap-space-sm sm:flex-row sm:items-center">
+      <div className="flex flex-col justify-between gap-space-md bg-primary-fixed px-margin-mobile py-space-md md:px-space-md">
+        <div>
+          <p className="font-label-caps text-label-caps text-on-primary-fixed-variant">
+            {counting ? "Arranca en" : "Inscripción"}
+          </p>
+
+          {counting ? (
+            <>
+              <p className="font-display-lg mt-3 text-[120px] font-black leading-[0.78] tracking-tighter tabular-nums text-on-primary-fixed">
+                {days === 0 ? "HOY" : String(days).padStart(2, "0")}
+              </p>
+              {days !== 0 && (
+                <p className="font-headline-lg text-headline-lg uppercase leading-none text-on-primary-fixed">
+                  {days === 1 ? "día" : "días"}
+                </p>
+              )}
+            </>
+          ) : (
+            <p className="font-display-lg mt-3 text-[64px] font-black uppercase leading-[0.9] tracking-tight text-on-primary-fixed">
+              Abierta
+            </p>
+          )}
+
+          <p className="font-label-caps text-label-caps mt-space-sm border-t border-on-primary-fixed/25 pt-space-sm text-on-primary-fixed-variant">
+            {startsAt ? formatLongDate(startsAt) : "La fecha se define pronto"}
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-2">
           <Link
             href={`/torneos/${tournament.id}/inscripcion`}
-            className="font-label-caps text-label-caps neon-glow-hover rounded border border-primary-fixed bg-primary-fixed px-8 py-4 text-center uppercase tracking-wider text-on-primary-fixed transition-all duration-200 hover:bg-primary-fixed-dim focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-fixed"
+            className="font-label-caps text-label-caps flex min-h-14 items-center justify-center bg-background text-center text-primary-fixed transition-colors hover:bg-surface-container-high focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-background"
           >
             Inscribirme
           </Link>
           <Link
             href={`/torneos/${tournament.id}`}
-            className="font-label-caps text-label-caps rounded border border-surface-bright px-8 py-4 text-center uppercase tracking-wider text-on-surface-variant transition-colors hover:border-primary-fixed hover:text-primary-fixed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-fixed"
+            className="font-label-caps text-label-caps flex min-h-14 items-center justify-center border border-on-primary-fixed text-center text-on-primary-fixed transition-colors hover:bg-primary-fixed-dim focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-background"
           >
             Ver el torneo
           </Link>
