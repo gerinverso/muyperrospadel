@@ -34,17 +34,23 @@ Detalles de cómo se aplica:
 
 ## La foto de la portada
 
-El hero de la home muestra la foto del grupo a sangre, con el nombre del club
-encima. El archivo va en **`public/equipo.jpg`** (`src/components/SiteHero.tsx`
-lo busca ahí por ruta fija).
+El hero de la home muestra la foto del grupo en una franja a sangre y, debajo,
+el nombre del club. El archivo va en **`public/equipo.jpg`**
+(`src/components/SiteHero.tsx` lo busca ahí por ruta fija, así que el nombre y
+la extensión tienen que ser exactamente esos).
 
-- Formato horizontal y bien ancho: se recorta con `object-fit: cover`, así que
-  en mobile se ve sólo la franja del centro.
-- El recorte está anclado un poco arriba del centro (`object-[center_35%]`),
-  que es donde suelen quedar las caras en una foto de grupo. Si en la foto
-  quedan más abajo, cambiar ese valor en `SiteHero.tsx`.
-- Si el archivo todavía no está, la portada no se rompe: se ve el panel de
-  líneas de cancha que tiene detrás.
+- El título va **debajo** de la foto y no encima: en una foto de grupo, un
+  titular del tamaño que pide una portada tapa las caras justo en la banda
+  donde están. El degradado del pie disuelve la foto en el fondo para que las
+  dos partes se lean como un solo bloque.
+- La franja se recorta con `object-fit: cover` y cambia de alto según la
+  pantalla (16:9 en mobile, 2:1 en tablet, 8:3 en desktop). El ancho se ve
+  siempre entero: lo que se recorta es arriba y abajo.
+- El recorte está anclado arriba del centro (`object-[center_30%]`), que es
+  donde quedan las caras. Si en una foto nueva quedan más abajo, ese es el
+  número a mover.
+- Si el archivo no está, la portada no se rompe: se ve el panel de líneas de
+  cancha que tiene detrás.
 
 ## Stack
 

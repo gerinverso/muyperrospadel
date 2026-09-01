@@ -3,47 +3,49 @@ import Image from "next/image";
 /**
  * La foto del grupo. Va en `public/`, asi que se referencia por ruta y no con
  * un import estatico: si el archivo todavia no esta, la pagina compila igual y
- * el hero se ve como el panel de lineas de cancha que tiene detras.
+ * la franja se ve como el panel de lineas de cancha que tiene detras.
  */
 const GROUP_PHOTO = "/equipo.jpg";
 
 /**
- * Portada de la home: la foto del grupo a sangre con el nombre del club encima.
+ * Portada de la home: la foto del grupo en una franja a sangre y, debajo, el
+ * nombre del club.
  *
- * Las capas se apilan por orden en el DOM y no con `z-index`: los tres bloques
- * de fondo son `absolute` y el contenido es `relative`, asi que cae ultimo y
- * queda arriba sin tener que numerar nada.
+ * El titulo va debajo y no encima de la foto a proposito. Es una foto de doce
+ * personas en fila: un titular del tamaño que pide una portada les taparia las
+ * caras justo en la banda donde estan. El degradado del pie disuelve la foto en
+ * el fondo, asi que las dos partes se leen como un solo bloque.
  */
 export default function SiteHero() {
   return (
-    <section className="relative flex min-h-[440px] flex-col justify-end overflow-hidden border-b border-surface-bright md:min-h-[600px]">
-      {/* Fondo de respaldo: si falta la foto el hero sigue teniendo textura en
-          vez de quedar un rectangulo vacio. */}
-      <div
-        aria-hidden="true"
-        className="court-lines absolute inset-0 bg-surface-container-low"
-      />
+    <section className="border-b border-surface-bright">
+      <div className="relative aspect-[16/9] w-full overflow-hidden sm:aspect-[2/1] lg:aspect-[8/3]">
+        {/* Fondo de respaldo: si falta la foto la franja sigue teniendo textura
+            en vez de quedar un rectangulo vacio. */}
+        <div
+          aria-hidden="true"
+          className="court-lines absolute inset-0 bg-surface-container-low"
+        />
 
-      {/* object-[center_35%]: en una foto de grupo las caras estan arriba del
-          centro, y abajo va el titulo. */}
-      <Image
-        src={GROUP_PHOTO}
-        alt="Los jugadores de Muy Perros Pádel"
-        fill
-        priority
-        sizes="(min-width: 1440px) 1440px, 100vw"
-        className="object-cover object-[center_35%]"
-      />
+        {/* object-[center_30%]: el recorte se ancla arriba del centro, que es
+            donde estan las caras. Si en una foto nueva quedan mas abajo, este
+            es el numero a mover. */}
+        <Image
+          src={GROUP_PHOTO}
+          alt="Los jugadores de Muy Perros Pádel en la cancha"
+          fill
+          priority
+          sizes="(min-width: 1440px) 1440px, 100vw"
+          className="object-cover object-[center_30%]"
+        />
 
-      {/* Dos capas en un solo div: el color de fondo al 40% oscurece la foto
-          entera (piso de contraste para el título, sea cual sea la foto) y el
-          degradado encima la cierra del todo abajo, donde va el texto. */}
-      <div
-        aria-hidden="true"
-        className="absolute inset-0 bg-background/40 bg-gradient-to-t from-background from-10% via-background/75 to-transparent"
-      />
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 bg-gradient-to-t from-background from-0% to-transparent to-45%"
+        />
+      </div>
 
-      <div className="relative px-margin-mobile pb-space-lg pt-space-xl md:px-margin-desktop md:pb-space-xl">
+      <div className="px-margin-mobile pb-space-lg md:px-margin-desktop">
         <p className="flex flex-wrap items-center gap-space-xs">
           <span aria-hidden="true" className="h-2 w-2 bg-primary-fixed" />
           <span className="font-label-caps text-label-caps text-primary-fixed">
@@ -51,13 +53,10 @@ export default function SiteHero() {
           </span>
         </p>
 
-        {/* El h1 de la portada. Las tres lineas son `span`s en bloque y no
-            saltos forzados: el texto sigue siendo "Muy Perros Pádel" para un
-            lector de pantalla, y las mayusculas las pone el CSS. */}
-        <h1 className="font-display-lg mt-space-md text-[clamp(3.25rem,15vw,9.5rem)] font-black uppercase leading-[0.82] tracking-[-0.04em] text-on-surface">
-          <span className="block">Muy</span>
-          <span className="block">Perros</span>
-          <span className="block text-primary-fixed">Pádel</span>
+        {/* El h1 de la pagina. El salto de linea lo decide el ancho: en mobile
+            "Pádel" cae solo abajo, en desktop entra todo en una linea. */}
+        <h1 className="font-display-lg mt-space-md text-[clamp(2.75rem,9.5vw,8.5rem)] font-black uppercase leading-[0.85] tracking-[-0.04em] text-on-surface">
+          Muy Perros <span className="text-primary-fixed">Pádel</span>
         </h1>
 
         <p className="font-body-lg text-body-lg mt-space-md max-w-[52ch] text-on-surface-variant">
