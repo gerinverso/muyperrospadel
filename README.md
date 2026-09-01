@@ -32,6 +32,20 @@ Detalles de cómo se aplica:
 - En un torneo con zonas, la pareja que clasifica puntúa por la ronda a la que llegó en el cuadro; la que queda afuera en la zona puntúa por su puesto en la tabla de su zona.
 - Si el cuadro es más chico, las instancias se cuentan desde la final hacia atrás: en un cuadro de 8 parejas la primera ronda son los cuartos, en uno de 4 son las semis.
 
+## La foto de la portada
+
+El hero de la home muestra la foto del grupo a sangre, con el nombre del club
+encima. El archivo va en **`public/equipo.jpg`** (`src/components/SiteHero.tsx`
+lo busca ahí por ruta fija).
+
+- Formato horizontal y bien ancho: se recorta con `object-fit: cover`, así que
+  en mobile se ve sólo la franja del centro.
+- El recorte está anclado un poco arriba del centro (`object-[center_35%]`),
+  que es donde suelen quedar las caras en una foto de grupo. Si en la foto
+  quedan más abajo, cambiar ese valor en `SiteHero.tsx`.
+- Si el archivo todavía no está, la portada no se rompe: se ve el panel de
+  líneas de cancha que tiene detrás.
+
 ## Stack
 
 - Next.js 16 (App Router) + TypeScript + Tailwind CSS
@@ -108,6 +122,10 @@ La forma más simple es desplegar en [Vercel](https://vercel.com):
 - `src/lib/ranking.ts`: puntaje por instancia y armado del ranking por temporada.
 - `src/lib/players.ts`: normalización de nombres y DNI para no duplicar jugadores.
 - `src/lib/auth.ts`: sesión de administrador y verificación de credenciales.
+- `src/lib/home-tournaments.ts`: los dos torneos que anuncia la home (el que
+  tiene la inscripción abierta y el que se está jugando).
+- `src/app/page.tsx`: la home, en este orden — portada con la foto del grupo,
+  aviso de torneos, ranking, cómo funciona y la tabla de torneos.
 - `src/app/admin/*`: panel de administración (protegido por login), incluido el listado de jugadores del club en `/admin/jugadores`.
 - `src/app/torneos/[id]`: vista pública del torneo.
 - `src/app/ranking`: ranking público por temporada.

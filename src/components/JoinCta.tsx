@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { formatLongDate } from "@/lib/format";
-import type { NextTournament } from "@/lib/next-tournament";
+import type { HomeTournament } from "@/lib/home-tournaments";
 
 /**
  * Cierre de la home: repite la accion principal al final del scroll, con la
@@ -10,7 +10,7 @@ import type { NextTournament } from "@/lib/next-tournament";
 export default function JoinCta({
   tournament,
 }: {
-  tournament: NextTournament;
+  tournament: HomeTournament;
 }) {
   return (
     <section className="flex flex-col items-start justify-between gap-space-md border-t-2 border-primary-fixed bg-surface-container-lowest px-margin-mobile py-space-lg md:flex-row md:items-center md:px-margin-desktop">

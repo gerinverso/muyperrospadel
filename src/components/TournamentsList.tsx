@@ -55,7 +55,10 @@ export default function TournamentsList({
   hiddenFields: { name: string; value: string }[];
 }) {
   return (
-    <section className="border-b border-surface-bright px-margin-mobile py-space-lg md:px-margin-desktop">
+    <section
+      id="torneos"
+      className="scroll-mt-[68px] border-b border-surface-bright px-margin-mobile py-space-lg md:px-margin-desktop"
+    >
       <div className="mb-space-md flex flex-wrap items-end justify-between gap-space-sm">
         <h2 className="font-headline-lg-mobile text-headline-lg-mobile uppercase tracking-tight text-on-surface md:font-headline-lg md:text-headline-lg">
           Torneos

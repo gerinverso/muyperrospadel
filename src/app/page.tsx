@@ -1,9 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import { statusLabels, type TournamentStatus } from "@/lib/types";
 import { formatFee, formatShortDate } from "@/lib/format";
-import { nextOpenTournament } from "@/lib/next-tournament";
+import { liveTournament, nextOpenTournament } from "@/lib/home-tournaments";
 import { finishedSeasons, seasonRanking } from "@/lib/ranking-query";
-import TournamentHero from "@/components/TournamentHero";
+import SiteHero from "@/components/SiteHero";
+import TournamentNotice from "@/components/TournamentNotice";
 import HowItWorks from "@/components/HowItWorks";
 import RankingBoard from "@/components/RankingBoard";
 import TournamentsList, {
@@ -56,27 +57,29 @@ export default async function Home({
   // lista, para que el contador diga cuántos quedaron afuera del filtro.
   const monthWhere = monthRange ? { createdAt: monthRange } : {};
 
-  const [nextTournament, ranking, tournaments, total] = await Promise.all([
-    nextOpenTournament(),
-    seasonRanking(season),
-    prisma.tournament.findMany({
-      orderBy: { createdAt: "desc" },
-      relationLoadStrategy: "join",
-      where: {
-        ...monthWhere,
-        ...(activeStatus !== "ALL" ? { status: activeStatus } : {}),
-      },
-      select: {
-        id: true,
-        name: true,
-        status: true,
-        startsAt: true,
-        registrationFee: true,
-        _count: { select: { players: true } },
-      },
-    }),
-    prisma.tournament.count({ where: monthWhere }),
-  ]);
+  const [nextTournament, playingNow, ranking, tournaments, total] =
+    await Promise.all([
+      nextOpenTournament(),
+      liveTournament(),
+      seasonRanking(season),
+      prisma.tournament.findMany({
+        orderBy: { createdAt: "desc" },
+        relationLoadStrategy: "join",
+        where: {
+          ...monthWhere,
+          ...(activeStatus !== "ALL" ? { status: activeStatus } : {}),
+        },
+        select: {
+          id: true,
+          name: true,
+          status: true,
+          startsAt: true,
+          registrationFee: true,
+          _count: { select: { players: true } },
+        },
+      }),
+      prisma.tournament.count({ where: monthWhere }),
+    ]);
 
   function hrefWith(next: {
     status?: string;
@@ -116,16 +119,11 @@ export default async function Home({
 
   return (
     <main className="mx-auto w-full max-w-[1440px] flex-grow">
-      {/* El título de la página existe para lectores de pantalla y buscadores:
-          en la pantalla el primer bloque es el anuncio del próximo torneo, que
-          dice mucho más que un encabezado genérico. */}
-      <h1 className="sr-only">
-        Muy Perros Pádel — torneos, ranking e inscripciones
-      </h1>
+      {/* El h1 de la página vive adentro de la portada: es el nombre del club
+          sobre la foto del grupo. */}
+      <SiteHero />
 
-      {nextTournament && <TournamentHero tournament={nextTournament} />}
-
-      <HowItWorks />
+      <TournamentNotice open={nextTournament} live={playingNow} />
 
       <RankingBoard
         rows={ranking.slice(0, RANKING_ROWS)}
@@ -133,6 +131,8 @@ export default async function Home({
         seasons={seasons}
         hrefForSeason={(y) => hrefWith({ temporada: String(y) })}
       />
+
+      <HowItWorks />
 
       <TournamentsList
         rows={rows}
